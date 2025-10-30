@@ -1,0 +1,142 @@
+/**
+ * WP Integrity Guard Settings Styles
+ *
+ * @package WP_Integrity_Guard
+ */
+
+/* Third-party section wrapper */
+.wpig-third-party-section {
+	margin-top: 40px;
+	padding-top: 20px;
+	border-top: 1px solid #dcdcde;
+}
+
+.wpig-third-party-section h2 {
+	margin-top: 0;
+	margin-bottom: 8px;
+	font-size: 1.3em;
+	line-height: 1.4;
+}
+
+.wpig-third-party-section .description {
+	margin-bottom: 20px;
+}
+
+/* Third-party plugins table wrapper */
+.wpig-third-party-table-wrapper {
+	width: 100%;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+/* Ensure table takes full width */
+.wpig-third-party-table-wrapper .wp-list-table {
+	width: 100%;
+	max-width: 100%;
+	table-layout: fixed;
+}
+
+/* Column width distribution */
+.wp-list-table thead th:nth-child(1),
+.wp-list-table tbody td:nth-child(1) {
+	width: 30%; /* Name column */
+}
+
+.wp-list-table thead th:nth-child(2),
+.wp-list-table tbody td:nth-child(2) {
+	width: 10%; /* Version column */
+}
+
+.wp-list-table thead th:nth-child(3),
+.wp-list-table tbody td:nth-child(3) {
+	width: 15%; /* Status column */
+}
+
+.wp-list-table thead th:nth-child(4),
+.wp-list-table tbody td:nth-child(4) {
+	width: 10%; /* Ignore column */
+	text-align: center;
+}
+
+.wp-list-table thead th:nth-child(5),
+.wp-list-table tbody td:nth-child(5) {
+	width: 35%; /* Action column - wider for button */
+	min-width: 200px;
+}
+
+/* Status column styling */
+.wpig-status,
+.wpig-theme-status {
+	display: inline-block;
+}
+
+/* Spinner alignment with generate button */
+.wp-list-table .spinner {
+	margin: 0 0 0 8px;
+	vertical-align: middle;
+}
+
+/* Active spinner state */
+.wp-list-table .spinner.is-active {
+	display: inline-block;
+}
+
+/* Generate button styling */
+.wpig-generate,
+.wpig-theme-generate {
+	white-space: nowrap;
+	font-size: 13px;
+	padding: 4px 8px;
+	min-height: 30px;
+}
+
+/* Checkbox labels */
+.wpig-third-party-table-wrapper label {
+	margin: 0;
+}
+
+/* Text overflow handling */
+.wp-list-table td {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wp-list-table td:first-child {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Action column - prevent overflow */
+.wp-list-table td:nth-child(5) {
+	white-space: nowrap;
+	overflow: visible;
+}
+
+/* Responsive table handling */
+@media screen and (max-width: 1200px) {
+	/* Adjust column widths for medium screens */
+	.wp-list-table thead th:nth-child(1),
+	.wp-list-table tbody td:nth-child(1) {
+		width: 25%;
+	}
+
+	.wp-list-table thead th:nth-child(5),
+	.wp-list-table tbody td:nth-child(5) {
+		width: 40%;
+	}
+}
+
+@media screen and (max-width: 782px) {
+	.wpig-third-party-table-wrapper {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	/* More compact buttons on mobile */
+	.wpig-generate,
+	.wpig-theme-generate {
+		font-size: 12px;
+		padding: 3px 6px;
+	}
+}
