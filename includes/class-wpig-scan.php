@@ -360,6 +360,12 @@ class WPIG_Scan {
 			);
 		}
 
+		$include_core_themes = in_array( 'themes', $targets, true );
+
+		if ( $include_core_themes && isset( $target_states['core'] ) ) {
+			$target_states['core']['include_core_themes'] = true;
+		}
+
 		return array(
 			'context'        => $context,
 			'targets'        => array_values( $targets ),
@@ -645,6 +651,8 @@ class WPIG_Scan {
 		$state['version'] = $version;
 		$state['locale']  = $locale;
 
+		$include_themes = ! empty( $state['include_core_themes'] );
+
 		$checksums = $this->fetch_core_checksums( $version, $locale );
 
 		if ( is_wp_error( $checksums ) ) {
@@ -653,8 +661,9 @@ class WPIG_Scan {
 
 		$state['locale'] = $checksums['locale'];
 
-		$filtered = $this->filter_core_checksums( $checksums['checksums'] );
-		$files    = array_keys( $filtered );
+		$allowed_theme_dirs = array();
+		$filtered           = $this->filter_core_checksums( $checksums['checksums'], $include_themes, $allowed_theme_dirs );
+		$files              = array_keys( $filtered );
 
 		$state['checksums'] = $filtered;
 		$state['files']     = $files;
@@ -666,7 +675,13 @@ class WPIG_Scan {
 		$state['added']     = array();
 		$state['errors']    = array();
 
-		$state['actual_files'] = $this->list_core_files();
+		if ( $include_themes ) {
+			$state['allowed_theme_dirs'] = $allowed_theme_dirs;
+		} else {
+			unset( $state['allowed_theme_dirs'] );
+		}
+
+		$state['actual_files'] = $this->list_core_files( $allowed_theme_dirs );
 
 		return true;
 	}
@@ -741,14 +756,28 @@ class WPIG_Scan {
 	/**
 	 * Filter checksum map to exclude user controlled files.
 	 *
-	 * @param array<string,string> $checksums Raw checksum map.
+	 * @param array<string,string> $checksums         Raw checksum map.
+	 * @param bool                 $include_themes    Whether to retain default theme checksums.
+	 * @param array<int,string>    $allowed_theme_dirs Populated with allowed theme directory prefixes when themes are included. Passed by reference.
 	 * @return array<string,string>
 	 */
-	private function filter_core_checksums( array $checksums ): array {
-		$filtered = array();
+	private function filter_core_checksums( array $checksums, bool $include_themes = false, array &$allowed_theme_dirs = array() ): array {
+		$filtered          = array();
+		$allowed_theme_map = array();
 
 		foreach ( $checksums as $path => $hash ) {
 			$normalized = ltrim( wp_normalize_path( (string) $path ), '/' );
+
+			if ( $include_themes && 0 === strpos( $normalized, 'wp-content/themes' ) ) {
+				$theme_dir = $this->resolve_core_theme_directory( $normalized );
+
+				if ( null !== $theme_dir ) {
+					$allowed_theme_map[ $theme_dir ] = true;
+				}
+
+				$filtered[ $normalized ] = (string) $hash;
+				continue;
+			}
 
 			if ( $this->is_core_path_excluded( $normalized ) ) {
 				continue;
@@ -757,7 +786,85 @@ class WPIG_Scan {
 			$filtered[ $normalized ] = (string) $hash;
 		}
 
+		if ( $include_themes ) {
+			if ( ! empty( $allowed_theme_map ) ) {
+				$allowed_theme_map['wp-content/themes'] = true;
+			}
+			$allowed_theme_dirs = array_values( array_keys( $allowed_theme_map ) );
+		} else {
+			$allowed_theme_dirs = array();
+		}
+
 		return $filtered;
+	}
+
+	/**
+	 * Resolve the theme directory prefix for a checksum path.
+	 *
+	 * @param string $path Normalized checksum path.
+	 * @return string|null
+	 */
+	private function resolve_core_theme_directory( string $path ): ?string {
+		$normalized = ltrim( wp_normalize_path( $path ), '/' );
+
+		if ( 0 !== strpos( $normalized, 'wp-content/themes' ) ) {
+			return null;
+		}
+
+		$parts = explode( '/', $normalized );
+
+		if ( count( $parts ) < 3 ) {
+			return 'wp-content/themes';
+		}
+
+		if ( 'themes' !== $parts[1] ) {
+			return null;
+		}
+
+		if ( count( $parts ) >= 4 ) {
+			$slug = $parts[2];
+			if ( '' !== $slug ) {
+				return 'wp-content/themes/' . $slug;
+			}
+		}
+
+		return 'wp-content/themes';
+	}
+
+	/**
+	 * Determine whether a path belongs to an allowed default theme directory.
+	 *
+	 * @param string        $path               Relative path from ABSPATH.
+	 * @param array<int,string> $allowed_theme_dirs Allowed theme directory prefixes.
+	 * @return bool
+	 */
+	private function is_allowed_theme_path( string $path, array $allowed_theme_dirs ): bool {
+		if ( empty( $allowed_theme_dirs ) ) {
+			return false;
+		}
+
+		$normalized = ltrim( wp_normalize_path( $path ), '/' );
+
+		foreach ( $allowed_theme_dirs as $allowed ) {
+			$allowed = ltrim( wp_normalize_path( $allowed ), '/' );
+
+			if ( $normalized === $allowed ) {
+				return true;
+			}
+
+			$allowed_with_slash   = $allowed . '/';
+			$normalized_with_slash = $normalized . '/';
+
+			if ( 0 === strpos( $normalized, $allowed_with_slash ) ) {
+				return true;
+			}
+
+			if ( 0 === strpos( $allowed_with_slash, $normalized_with_slash ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -865,7 +972,7 @@ class WPIG_Scan {
 
 		$state['modified'] = array_values( $state['modified'] );
 
-		unset( $state['checksums'], $state['files'], $state['actual_files'], $state['pointer'] );
+		unset( $state['checksums'], $state['files'], $state['actual_files'], $state['pointer'], $state['allowed_theme_dirs'] );
 	}
 
 	/**
@@ -878,9 +985,24 @@ class WPIG_Scan {
 		$modified = count( $state['modified'] ?? array() );
 		$missing  = count( $state['missing'] ?? array() );
 		$added    = count( $state['added'] ?? array() );
+		$includes_themes = ! empty( $state['include_core_themes'] );
 
 		if ( 0 === $modified && 0 === $missing && 0 === $added ) {
+			if ( $includes_themes ) {
+				return __( 'WordPress core and bundled themes scan completed without integrity issues.', $this->textdomain );
+			}
+
 			return __( 'WordPress core scan completed without integrity issues.', $this->textdomain );
+		}
+
+		if ( $includes_themes ) {
+			return sprintf(
+				/* translators: 1: modified count, 2: missing count, 3: added count. */
+				__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', $this->textdomain ),
+				$modified,
+				$missing,
+				$added
+			);
 		}
 
 		return sprintf(
@@ -899,17 +1021,18 @@ class WPIG_Scan {
 	 * @return array<string,mixed>
 	 */
 	private function summarize_core_result( array $state ): array {
-	return array(
-		'status'   => $state['status'] ?? 'unknown',
-		'version'  => $state['version'] ?? '',
-		'locale'   => $state['locale'] ?? '',
-		'modified' => $state['modified'] ?? array(),
-		'missing'  => $state['missing'] ?? array(),
-		'added'    => $state['added'] ?? array(),
-		'errors'   => $state['errors'] ?? array(),
-		'summary'  => $this->build_core_summary_message( $state ),
-	);
-}
+		return array(
+			'status'          => $state['status'] ?? 'unknown',
+			'version'         => $state['version'] ?? '',
+			'locale'          => $state['locale'] ?? '',
+			'themes_included' => ! empty( $state['include_core_themes'] ),
+			'modified'        => $state['modified'] ?? array(),
+			'missing'         => $state['missing'] ?? array(),
+			'added'           => $state['added'] ?? array(),
+			'errors'          => $state['errors'] ?? array(),
+			'summary'         => $this->build_core_summary_message( $state ),
+		);
+	}
 
 	/**
 	 * Advance the plugin scan state by one step.
@@ -1786,11 +1909,22 @@ class WPIG_Scan {
 			return new WP_Error( 'wpig_plugin_checksum_args', __( 'Invalid plugin checksum request.', $this->textdomain ) );
 		}
 
-		$url      = sprintf( 'https://api.wordpress.org/plugins/checksums/1.0/%1$s/%2$s', rawurlencode( $slug ), rawurlencode( $version ) );
-		$request  = wp_remote_get(
+		return $this->fetch_plugin_checksums_from_downloads( $slug, $version );
+	}
+
+	/**
+	 * Retrieve plugin checksums via downloads.wordpress.org endpoint.
+	 *
+	 * @param string $slug Plugin slug.
+	 * @param string $version Plugin version.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	private function fetch_plugin_checksums_from_downloads( string $slug, string $version ) {
+		$url     = sprintf( 'https://downloads.wordpress.org/plugin-checksums/%1$s/%2$s.json', rawurlencode( $slug ), rawurlencode( $version ) );
+		$request = wp_remote_get(
 			$url,
 			array(
-				'timeout'   => 20,
+				'timeout'    => 20,
 				'user-agent' => 'WP Integrity Guard/' . $this->version,
 			)
 		);
@@ -1801,6 +1935,10 @@ class WPIG_Scan {
 
 		$code = (int) wp_remote_retrieve_response_code( $request );
 		if ( 200 !== $code ) {
+			if ( 404 === $code ) {
+				return new WP_Error( 'wpig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
+			}
+
 			return new WP_Error( 'wpig_plugin_checksum_http', __( 'Unable to download plugin checksums.', $this->textdomain ) );
 		}
 
@@ -1811,22 +1949,13 @@ class WPIG_Scan {
 			return new WP_Error( 'wpig_plugin_checksum_json', __( 'Unexpected plugin checksum response.', $this->textdomain ) );
 		}
 
-		if ( empty( $data['checksums'] ) || ! is_array( $data['checksums'] ) ) {
-			if ( isset( $data['error'] ) && is_string( $data['error'] ) ) {
-				return new WP_Error( 'wpig_plugin_checksum_error', $data['error'] );
-			}
-
+		if ( empty( $data['files'] ) || ! is_array( $data['files'] ) ) {
 			return new WP_Error( 'wpig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
 		}
 
-		$type = isset( $data['checksum_type'] ) ? strtolower( (string) $data['checksum_type'] ) : 'md5';
-		if ( ! in_array( $type, array( 'md5', 'sha256' ), true ) ) {
-			$type = 'md5';
-		}
-
 		return array(
-			'checksums'      => $data['checksums'],
-			'checksum_type'  => $type,
+			'checksums'     => $data['files'],
+			'checksum_type' => 'md5',
 		);
 	}
 
@@ -2223,7 +2352,7 @@ class WPIG_Scan {
 	 *
 	 * @return array<int,string>
 	 */
-	private function list_core_files(): array {
+	private function list_core_files( array $allowed_theme_dirs = array() ): array {
 		$files = array();
 		$root  = wp_normalize_path( trailingslashit( ABSPATH ) );
 		$base  = strlen( $root );
@@ -2231,7 +2360,7 @@ class WPIG_Scan {
 		$directory = new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS );
 		$filter    = new RecursiveCallbackFilterIterator(
 			$directory,
-			function ( SplFileInfo $current ) use ( $root, $base ) {
+			function ( SplFileInfo $current ) use ( $root, $base, $allowed_theme_dirs ) {
 				$path = wp_normalize_path( $current->getPathname() );
 				$rel  = ltrim( substr( $path, $base ), '/' );
 
@@ -2240,10 +2369,10 @@ class WPIG_Scan {
 				}
 
 				if ( $current->isDir() ) {
-					return ! $this->is_core_path_excluded( $rel );
+					return ! $this->is_core_path_excluded( $rel, $allowed_theme_dirs );
 				}
 
-				return ! $this->is_core_path_excluded( $rel );
+				return ! $this->is_core_path_excluded( $rel, $allowed_theme_dirs );
 			}
 		);
 
@@ -2257,7 +2386,7 @@ class WPIG_Scan {
 			$path = wp_normalize_path( $file->getPathname() );
 			$rel  = ltrim( substr( $path, $base ), '/' );
 
-			if ( '' === $rel || $this->is_core_path_excluded( $rel ) ) {
+			if ( '' === $rel || $this->is_core_path_excluded( $rel, $allowed_theme_dirs ) ) {
 				continue;
 			}
 
@@ -2273,12 +2402,16 @@ class WPIG_Scan {
 	 * @param string $path Relative path from ABSPATH.
 	 * @return bool
 	 */
-	private function is_core_path_excluded( string $path ): bool {
+	private function is_core_path_excluded( string $path, array $allowed_theme_dirs = array() ): bool {
 		$normalized = ltrim( wp_normalize_path( $path ), '/' );
 		$normalized = untrailingslashit( $normalized );
 
 		foreach ( self::CORE_EXCLUDED_FILES as $file ) {
 			if ( $normalized === $file ) {
+				if ( ! empty( $allowed_theme_dirs ) && $this->is_allowed_theme_path( $normalized, $allowed_theme_dirs ) ) {
+					continue;
+				}
+
 				return true;
 			}
 		}
@@ -2292,6 +2425,12 @@ class WPIG_Scan {
 			$prefix = untrailingslashit( $prefix );
 
 			if ( 0 === strpos( $normalized, $prefix ) ) {
+				if ( 'wp-content/themes' === $prefix && ! empty( $allowed_theme_dirs ) ) {
+					if ( $this->is_allowed_theme_path( $normalized, $allowed_theme_dirs ) ) {
+						continue;
+					}
+				}
+
 				$remainder = substr( $normalized, strlen( $prefix ) );
 				if ( '' === $remainder || '/' === $remainder[0] ) {
 					return true;
