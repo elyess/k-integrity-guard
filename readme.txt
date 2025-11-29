@@ -1,5 +1,5 @@
 === WP Integrity Guard ===
-Contributors: elyess
+Contributors: elyesz
 Donate link: https://github.com/sponsors/elyess
 Tags: security, integrity, malware, checksum, maintenance
 Requires at least: 6.0
