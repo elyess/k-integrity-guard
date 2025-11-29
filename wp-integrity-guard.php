@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Integrity Guard
  * Description: Monitors and protects your WordPress core files, themes, and plugins from unauthorized changes.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Elyes Zouaghi
  * Author URI: https://github.com/elyess/wp-integrity-guard
  * License: GPL-2.0+
@@ -17,11 +17,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/includes/class-wpig-settings.php';
 require_once __DIR__ . '/includes/class-wpig-utils.php';
+require_once __DIR__ . '/includes/class-wpig-db.php';
 require_once __DIR__ . '/includes/class-wpig-scan.php';
+require_once __DIR__ . '/includes/class-wpig-history-table.php';
 
 class WP_Integrity_Guard {
 
-	const VERSION = '1.0.0';
+	const VERSION = '1.1.0';
 	const TEXTDOMAIN = 'wp-integrity-guard';
 
 	const CAPABILITY = 'manage_options';
@@ -35,11 +37,13 @@ class WP_Integrity_Guard {
 
 	private WPIG_Settings $settings;
 	private WPIG_Scan $scan;
+	private WPIG_DB $db;
 
 	public function __construct() {
 		$this->plugin_file = __FILE__;
 		$this->settings = new WPIG_Settings();
-		$this->scan = new WPIG_Scan( $this->plugin_file, self::SLUG_SCAN, $this->settings, self::TEXTDOMAIN, self::VERSION );
+		$this->db = new WPIG_DB();
+		$this->scan = new WPIG_Scan( $this->plugin_file, self::SLUG_SCAN, $this->settings, self::TEXTDOMAIN, self::VERSION, $this->db );
 		add_action('admin_menu', [$this, 'register_admin_menu']);
 		add_filter('plugin_action_links_' . plugin_basename($this->plugin_file), [$this, 'plugin_action_links']);
 		add_action('admin_notices',        [$this, 'show_first_scan_notice']);
@@ -372,4 +376,7 @@ register_activation_hook(__FILE__, function ($network_wide) {
     } else {
         update_option('wpig_show_first_scan_notice', 'yes');
     }
+    
+    // Create scan history table.
+    WPIG_DB::create_table();
 });

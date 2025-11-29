@@ -5,7 +5,7 @@ Tags: security, integrity, malware, checksum, maintenance
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,9 +41,18 @@ Yes. Network administrators can run scans and manage settings across the network
 2. Settings page with daily scan and third-party checksum tools.
 
 == Changelog ==
+= 1.1.0 =
+* Added comprehensive scan history feature with custom database table
+* View all past scans with filtering and sorting options
+* Detailed scan results view showing all file changes
+* Bulk delete and history management actions
+
 = 1.0.0 =
 * Initial release with scan dashboard, daily scheduling, and third-party checksum tools.
 
 == Upgrade Notice ==
+= 1.1.0 =
+New scan history feature! Track all your integrity scans over time with detailed results.
+
 = 1.0.0 =
 Initial release. Install to start monitoring WordPress core, plugins, and themes.

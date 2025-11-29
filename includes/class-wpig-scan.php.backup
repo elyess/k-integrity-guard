@@ -2573,7 +2573,6 @@ class WPIG_Scan {
 	}
 }
 
-
 	/**
 	 * Advance the third-party plugin scan state by one step.
 	 *

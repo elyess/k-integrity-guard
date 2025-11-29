@@ -78,6 +78,7 @@ class WPIG_Settings {
                 'core'    => true,
                 'plugins' => true,
                 'themes'  => true,
+                'third_party_plugins' => false,
             ],
             'third_party' => [
                 'ignore' => [],
