@@ -2,7 +2,7 @@
 /**
  * Scan history detail view.
  *
- * @package WP_Integrity_Guard
+ * @package K_Integrity_Guard
  * @var array $scan Scan record data.
  */
 
@@ -16,11 +16,11 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 ?>
 
 <div class="wrap">
-	<h1><?php esc_html_e( 'Scan Details', 'wp-integrity-guard' ); ?></h1>
+	<h1><?php esc_html_e( 'Scan Details', 'k-integrity-guard' ); ?></h1>
 
 	<p>
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . WP_Integrity_Guard::SLUG_HISTORY ) ); ?>" class="button">
-			&larr; <?php esc_html_e( 'Back to History', 'wp-integrity-guard' ); ?>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY ) ); ?>" class="button">
+			&larr; <?php esc_html_e( 'Back to History', 'k-integrity-guard' ); ?>
 		</a>
 	</p>
 
@@ -28,51 +28,51 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 		<table class="widefat fixed striped">
 			<tbody>
 				<tr>
-					<th style="width: 200px;"><?php esc_html_e( 'Scan Date', 'wp-integrity-guard' ); ?></th>
+					<th style="width: 200px;"><?php esc_html_e( 'Scan Date', 'k-integrity-guard' ); ?></th>
 					<td><?php echo esc_html( $scan_date ); ?></td>
 				</tr>
 				<tr>
-					<th><?php esc_html_e( 'Context', 'wp-integrity-guard' ); ?></th>
+					<th><?php esc_html_e( 'Context', 'k-integrity-guard' ); ?></th>
 					<td>
 						<?php
 						if ( 'cron' === $scan['context'] ) {
-							echo '<span class="wpig-context-badge wpig-context-cron">' . esc_html__( 'Scheduled', 'wp-integrity-guard' ) . '</span>';
+							echo '<span class="wpig-context-badge wpig-context-cron">' . esc_html__( 'Scheduled', 'k-integrity-guard' ) . '</span>';
 						} else {
-							echo '<span class="wpig-context-badge wpig-context-manual">' . esc_html__( 'Manual', 'wp-integrity-guard' ) . '</span>';
+							echo '<span class="wpig-context-badge wpig-context-manual">' . esc_html__( 'Manual', 'k-integrity-guard' ) . '</span>';
 						}
 						?>
 					</td>
 				</tr>
 				<tr>
-					<th><?php esc_html_e( 'Status', 'wp-integrity-guard' ); ?></th>
+					<th><?php esc_html_e( 'Status', 'k-integrity-guard' ); ?></th>
 					<td>
 						<?php
 						switch ( $scan['status'] ) {
 							case 'success':
-								echo '<span class="wpig-status-badge wpig-status-success">' . esc_html__( 'Success', 'wp-integrity-guard' ) . '</span>';
+								echo '<span class="wpig-status-badge wpig-status-success">' . esc_html__( 'Success', 'k-integrity-guard' ) . '</span>';
 								break;
 							case 'warning':
-								echo '<span class="wpig-status-badge wpig-status-warning">' . esc_html__( 'Warning', 'wp-integrity-guard' ) . '</span>';
+								echo '<span class="wpig-status-badge wpig-status-warning">' . esc_html__( 'Warning', 'k-integrity-guard' ) . '</span>';
 								break;
 							case 'error':
-								echo '<span class="wpig-status-badge wpig-status-error">' . esc_html__( 'Error', 'wp-integrity-guard' ) . '</span>';
+								echo '<span class="wpig-status-badge wpig-status-error">' . esc_html__( 'Error', 'k-integrity-guard' ) . '</span>';
 								break;
 						}
 						?>
 					</td>
 				</tr>
 				<tr>
-					<th><?php esc_html_e( 'Total Issues', 'wp-integrity-guard' ); ?></th>
+					<th><?php esc_html_e( 'Total Issues', 'k-integrity-guard' ); ?></th>
 					<td><strong><?php echo esc_html( number_format_i18n( $scan['total_issues'] ) ); ?></strong></td>
 				</tr>
 				<tr>
-					<th><?php esc_html_e( 'Summary', 'wp-integrity-guard' ); ?></th>
+					<th><?php esc_html_e( 'Summary', 'k-integrity-guard' ); ?></th>
 					<td><?php echo esc_html( $scan['summary'] ); ?></td>
 				</tr>
 			</tbody>
 		</table>
 
-		<h2><?php esc_html_e( 'Scan Results', 'wp-integrity-guard' ); ?></h2>
+		<h2><?php esc_html_e( 'Scan Results', 'k-integrity-guard' ); ?></h2>
 
 		<?php foreach ( $targets as $target ) : ?>
 			<?php if ( ! isset( $results[ $target ] ) ) {
@@ -88,13 +88,13 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 				<?php
 				switch ( $target ) {
 					case 'core':
-						esc_html_e( 'WordPress Core', 'wp-integrity-guard' );
+						esc_html_e( 'WordPress Core', 'k-integrity-guard' );
 						break;
 					case 'plugins':
-						esc_html_e( 'Plugins', 'wp-integrity-guard' );
+						esc_html_e( 'Plugins', 'k-integrity-guard' );
 						break;
 					case 'themes':
-						esc_html_e( 'Themes', 'wp-integrity-guard' );
+						esc_html_e( 'Themes', 'k-integrity-guard' );
 						break;
 					default:
 						echo esc_html( ucfirst( $target ) );
@@ -114,7 +114,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 
 					<div class="wpig-item-detail" style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
 						<h4 style="margin-top: 0;">
-							<?php echo esc_html( $item['name'] ?? __( 'Unknown', 'wp-integrity-guard' ) ); ?>
+							<?php echo esc_html( $item['name'] ?? __( 'Unknown', 'k-integrity-guard' ) ); ?>
 							<?php if ( isset( $item['version'] ) ) : ?>
 								<small>(v<?php echo esc_html( $item['version'] ); ?>)</small>
 							<?php endif; ?>
@@ -131,7 +131,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 									echo esc_html(
 										sprintf(
 											/* translators: %d: number of files */
-											_n( '%d Modified File', '%d Modified Files', count( $item['modified'] ), 'wp-integrity-guard' ),
+											_n( '%d Modified File', '%d Modified Files', count( $item['modified'] ), 'k-integrity-guard' ),
 											count( $item['modified'] )
 										)
 									);
@@ -152,7 +152,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 									echo esc_html(
 										sprintf(
 											/* translators: %d: number of files */
-											_n( '%d Missing File', '%d Missing Files', count( $item['missing'] ), 'wp-integrity-guard' ),
+											_n( '%d Missing File', '%d Missing Files', count( $item['missing'] ), 'k-integrity-guard' ),
 											count( $item['missing'] )
 										)
 									);
@@ -173,7 +173,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 									echo esc_html(
 										sprintf(
 											/* translators: %d: number of files */
-											_n( '%d Added File', '%d Added Files', count( $item['added'] ), 'wp-integrity-guard' ),
+											_n( '%d Added File', '%d Added Files', count( $item['added'] ), 'k-integrity-guard' ),
 											count( $item['added'] )
 										)
 									);

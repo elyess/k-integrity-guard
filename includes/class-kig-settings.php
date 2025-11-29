@@ -1,10 +1,10 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-class WPIG_Settings {
-    const OPTION = 'wpig_options';       // single array option
-    const PAGE   = 'wp_integrity_guard_settings';      // settings page slug used by Settings API
-    const TEXTDOMAIN     = 'wp-integrity-guard'; // text domain
+class KIG_Settings {
+    const OPTION = 'kig_options';       // single array option
+    const PAGE   = 'k_integrity_guard_settings';      // settings page slug used by Settings API
+    const TEXTDOMAIN     = 'k-integrity-guard'; // text domain
 
     public function __construct()
     {
@@ -13,8 +13,8 @@ class WPIG_Settings {
         add_action('update_option_' . self::OPTION, [$this, 'handle_cron'], 10, 3);
         // Settings UI assets and AJAX.
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
-        add_action('wp_ajax_wpig_generate_checksum', [$this, 'ajax_generate_checksum']);
-        add_action('wp_ajax_wpig_generate_theme_checksum', [$this, 'ajax_generate_theme_checksum']);
+        add_action('wp_ajax_kig_generate_checksum', [$this, 'ajax_generate_checksum']);
+        add_action('wp_ajax_kig_generate_theme_checksum', [$this, 'ajax_generate_theme_checksum']);
     }
 
     /** Register Settings, Sections, Fields */
@@ -32,10 +32,10 @@ class WPIG_Settings {
 
         // Section: General
         add_settings_section(
-            'wpig_general',
+            'kig_general',
             __('General', self::TEXTDOMAIN),
             function () {
-                echo '<p>' . esc_html__('Basic configuration for WP Integrity Guard.', self::TEXTDOMAIN) . '</p>';
+                echo '<p>' . esc_html__('Basic configuration for K'Integrity Guard.', self::TEXTDOMAIN) . '</p>';
             },
             self::PAGE
         );
@@ -45,12 +45,12 @@ class WPIG_Settings {
             __('Enable daily scan', self::TEXTDOMAIN),
             [$this, 'field_daily_scan_enabled'],
             self::PAGE,
-            'wpig_general'
+            'kig_general'
         );
 
         // Section: Integrity Targets
         add_settings_section(
-            'wpig_targets',
+            'kig_targets',
             __('Check integrity for', self::TEXTDOMAIN),
             function () {
                 echo '<p>' . esc_html__('Choose what to include in integrity checks.', self::TEXTDOMAIN) . '</p>';
@@ -63,7 +63,7 @@ class WPIG_Settings {
             __('Targets', self::TEXTDOMAIN),
             [$this, 'field_targets'],
             self::PAGE,
-            'wpig_targets'
+            'kig_targets'
         );
 
         // Note: Third-party plugins and themes sections are rendered separately in the view template
@@ -175,11 +175,11 @@ class WPIG_Settings {
         $was = !empty($old_value['daily_scan_enabled']);
         $now = !empty($value['daily_scan_enabled']);
 
-        if ($now && !$was && !wp_next_scheduled('wpig_daily_scan')) {
-            wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'wpig_daily_scan');
+        if ($now && !$was && !wp_next_scheduled('kig_daily_scan')) {
+            wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'kig_daily_scan');
         } elseif (!$now && $was) {
-            $timestamp = wp_next_scheduled('wpig_daily_scan');
-            if ($timestamp) wp_unschedule_event($timestamp, 'wpig_daily_scan');
+            $timestamp = wp_next_scheduled('kig_daily_scan');
+            if ($timestamp) wp_unschedule_event($timestamp, 'kig_daily_scan');
         }
     }
 
@@ -195,7 +195,7 @@ class WPIG_Settings {
             return;
         }
 
-        $plugin_file = dirname( __DIR__ ) . '/wp-integrity-guard.php';
+        $plugin_file = dirname( __DIR__ ) . '/k-integrity-guard.php';
         $css_url     = plugins_url( 'assets/css/settings.css', $plugin_file );
         $script_url  = plugins_url( 'assets/js/settings.js', $plugin_file );
 
@@ -221,7 +221,7 @@ class WPIG_Settings {
             'wpigSettings',
             array(
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-                'nonce'   => wp_create_nonce( 'wpig_generate_checksum' ),
+                'nonce'   => wp_create_nonce( 'kig_generate_checksum' ),
                 'l10n'    => array(
                     'upToDate' => __( 'Up to date', self::TEXTDOMAIN ),
                     'working'  => __( 'Working…', self::TEXTDOMAIN ),
@@ -239,16 +239,16 @@ class WPIG_Settings {
      * @return void
      */
     public function field_third_party_list() {
-        if ( ! class_exists( 'WPIG_Third_Party_Plugins_Table' ) ) {
+        if ( ! class_exists( 'KIG_Third_Party_Plugins_Table' ) ) {
             require_once dirname( __FILE__ ) . '/class-wpig-third-party-table.php';
         }
-        if ( ! class_exists( 'WPIG_Utils' ) ) {
+        if ( ! class_exists( 'KIG_Utils' ) ) {
             require_once dirname( __FILE__ ) . '/class-wpig-utils.php';
         }
 
         $opts    = $this->get_options();
         $ignores = isset( $opts['third_party']['ignore'] ) ? $opts['third_party']['ignore'] : array();
-        $sources = WPIG_Utils::detect_plugin_sources();
+        $sources = KIG_Utils::detect_plugin_sources();
 
         $items = array();
 
@@ -260,7 +260,7 @@ class WPIG_Settings {
             $name    = '' !== $plugin['name'] ? $plugin['name'] : $file;
             $version = '' !== $plugin['version'] ? $plugin['version'] : __( 'Unknown', self::TEXTDOMAIN );
 
-            $status_text = WPIG_Utils::checksum_is_stale( $file )
+            $status_text = KIG_Utils::checksum_is_stale( $file )
                 ? __( 'Needs update', self::TEXTDOMAIN )
                 : __( 'Up to date', self::TEXTDOMAIN );
 
@@ -287,7 +287,7 @@ class WPIG_Settings {
             );
         }
 
-        $table = new WPIG_Third_Party_Plugins_Table(
+        $table = new KIG_Third_Party_Plugins_Table(
             array(
                 'items' => $items,
             )
@@ -304,16 +304,16 @@ class WPIG_Settings {
      * @return void
      */
     public function field_third_party_themes_list() {
-        if ( ! class_exists( 'WPIG_Third_Party_Themes_Table' ) ) {
+        if ( ! class_exists( 'KIG_Third_Party_Themes_Table' ) ) {
             require_once dirname( __FILE__ ) . '/class-wpig-third-party-table.php';
         }
-        if ( ! class_exists( 'WPIG_Utils' ) ) {
+        if ( ! class_exists( 'KIG_Utils' ) ) {
             require_once dirname( __FILE__ ) . '/class-wpig-utils.php';
         }
 
         $opts    = $this->get_options();
         $ignores = isset( $opts['third_party_themes']['ignore'] ) ? $opts['third_party_themes']['ignore'] : array();
-        $sources = WPIG_Utils::detect_theme_sources();
+        $sources = KIG_Utils::detect_theme_sources();
 
         $items = array();
 
@@ -325,7 +325,7 @@ class WPIG_Settings {
             $name    = '' !== $theme['name'] ? $theme['name'] : $stylesheet;
             $version = '' !== $theme['version'] ? $theme['version'] : __( 'Unknown', self::TEXTDOMAIN );
 
-            $status_text = WPIG_Utils::theme_checksum_is_stale( $stylesheet )
+            $status_text = KIG_Utils::theme_checksum_is_stale( $stylesheet )
                 ? __( 'Needs update', self::TEXTDOMAIN )
                 : __( 'Up to date', self::TEXTDOMAIN );
 
@@ -352,7 +352,7 @@ class WPIG_Settings {
             );
         }
 
-        $table = new WPIG_Third_Party_Themes_Table(
+        $table = new KIG_Third_Party_Themes_Table(
             array(
                 'items' => $items,
             )
@@ -366,18 +366,18 @@ class WPIG_Settings {
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => __('Access denied.', self::TEXTDOMAIN)], 403);
         }
-        check_ajax_referer('wpig_generate_checksum', 'nonce');
+        check_ajax_referer('kig_generate_checksum', 'nonce');
 
         $plugin_file = isset($_POST['plugin_file']) ? sanitize_text_field(wp_unslash($_POST['plugin_file'])) : '';
         if ('' === $plugin_file) {
             wp_send_json_error(['message' => __('Invalid plugin.', self::TEXTDOMAIN)], 400);
         }
 
-        if (!class_exists('WPIG_Utils')) {
+        if (!class_exists('KIG_Utils')) {
             require_once dirname(__FILE__) . '/class-wpig-utils.php';
         }
 
-        $result = WPIG_Utils::generate_plugin_checksum_json($plugin_file);
+        $result = KIG_Utils::generate_plugin_checksum_json($plugin_file);
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
         }
@@ -396,18 +396,18 @@ class WPIG_Settings {
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => __('Access denied.', self::TEXTDOMAIN)], 403);
         }
-        check_ajax_referer('wpig_generate_checksum', 'nonce');
+        check_ajax_referer('kig_generate_checksum', 'nonce');
 
         $stylesheet = isset($_POST['stylesheet']) ? sanitize_text_field(wp_unslash($_POST['stylesheet'])) : '';
         if ('' === $stylesheet) {
             wp_send_json_error(['message' => __('Invalid theme.', self::TEXTDOMAIN)], 400);
         }
 
-        if (!class_exists('WPIG_Utils')) {
+        if (!class_exists('KIG_Utils')) {
             require_once dirname(__FILE__) . '/class-wpig-utils.php';
         }
 
-        $result = WPIG_Utils::generate_theme_checksum_json($stylesheet);
+        $result = KIG_Utils::generate_theme_checksum_json($stylesheet);
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
         }

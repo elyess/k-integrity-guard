@@ -1,8 +1,8 @@
 <?php
 /**
- * Database handler for WP Integrity Guard scan history.
+ * Database handler for K'Integrity Guard scan history.
  *
- * @package WP_Integrity_Guard
+ * @package K_Integrity_Guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Manages the custom database table for scan history.
  */
-class WPIG_DB {
+class KIG_DB {
 
 	/**
 	 * Database table version for upgrades.
@@ -22,7 +22,7 @@ class WPIG_DB {
 	/**
 	 * Option name for storing database version.
 	 */
-	const DB_VERSION_OPTION = 'wpig_db_version';
+	const DB_VERSION_OPTION = 'kig_db_version';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -31,7 +31,7 @@ class WPIG_DB {
 	 */
 	public static function get_table_name() {
 		global $wpdb;
-		return $wpdb->prefix . 'wpig_scan_history';
+		return $wpdb->prefix . 'kig_scan_history';
 	}
 
 	/**

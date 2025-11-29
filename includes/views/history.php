@@ -2,7 +2,7 @@
 /**
  * History page template.
  *
- * @package WP_Integrity_Guard
+ * @package K_Integrity_Guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,8 +17,8 @@ if ( isset( $_GET['action'] ) ) {
 	if ( 'delete' === $action && isset( $_GET['scan_id'] ) ) {
 		$scan_id = absint( $_GET['scan_id'] );
 		if ( check_admin_referer( 'delete_scan_' . $scan_id ) ) {
-			WPIG_DB::delete_scan( $scan_id );
-			wp_safe_redirect( admin_url( 'admin.php?page=' . WP_Integrity_Guard::SLUG_HISTORY . '&deleted=1' ) );
+			KIG_DB::delete_scan( $scan_id );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&deleted=1' ) );
 			exit;
 		}
 	}
@@ -26,7 +26,7 @@ if ( isset( $_GET['action'] ) ) {
 	// Handle view details.
 	if ( 'view' === $action && isset( $_GET['scan_id'] ) ) {
 		$scan_id = absint( $_GET['scan_id'] );
-		$scan    = WPIG_DB::get_scan( $scan_id );
+		$scan    = KIG_DB::get_scan( $scan_id );
 
 		if ( $scan ) {
 			include __DIR__ . '/history-detail.php';
@@ -39,20 +39,20 @@ if ( isset( $_GET['action'] ) ) {
 if ( isset( $_POST['action'] ) && 'delete' === $_POST['action'] && ! empty( $_POST['scan_ids'] ) ) {
 	check_admin_referer( 'bulk-scans' );
 	$scan_ids = array_map( 'absint', $_POST['scan_ids'] );
-	WPIG_DB::delete_scans( $scan_ids );
-	wp_safe_redirect( admin_url( 'admin.php?page=' . WP_Integrity_Guard::SLUG_HISTORY . '&deleted=' . count( $scan_ids ) ) );
+	KIG_DB::delete_scans( $scan_ids );
+	wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&deleted=' . count( $scan_ids ) ) );
 	exit;
 }
 
 // Handle empty history action.
-if ( isset( $_POST['wpig_empty_history'] ) ) {
-	check_admin_referer( 'wpig_empty_history' );
-	$deleted_count = WPIG_DB::delete_all_scans();
-	wp_safe_redirect( admin_url( 'admin.php?page=' . WP_Integrity_Guard::SLUG_HISTORY . '&emptied=' . $deleted_count ) );
+if ( isset( $_POST['kig_empty_history'] ) ) {
+	check_admin_referer( 'kig_empty_history' );
+	$deleted_count = KIG_DB::delete_all_scans();
+	wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&emptied=' . $deleted_count ) );
 	exit;
 }
 
-$table = new WPIG_History_Table();
+$table = new KIG_History_Table();
 $table->prepare_items();
 ?>
 
@@ -67,7 +67,7 @@ $table->prepare_items();
 				echo esc_html(
 					sprintf(
 						/* translators: %d: number of scans deleted */
-						_n( '%d scan deleted successfully.', '%d scans deleted successfully.', $count, 'wp-integrity-guard' ),
+						_n( '%d scan deleted successfully.', '%d scans deleted successfully.', $count, 'k-integrity-guard' ),
 						$count
 					)
 				);
@@ -84,7 +84,7 @@ $table->prepare_items();
 				echo esc_html(
 					sprintf(
 						/* translators: %d: number of scans deleted */
-						__( 'History emptied. %d scans deleted.', 'wp-integrity-guard' ),
+						__( 'History emptied. %d scans deleted.', 'k-integrity-guard' ),
 						$count
 					)
 				);
@@ -94,7 +94,7 @@ $table->prepare_items();
 	<?php endif; ?>
 
 	<p class="description">
-		<?php esc_html_e( 'View the complete history of all integrity scans. Click on a scan to see detailed results.', 'wp-integrity-guard' ); ?>
+		<?php esc_html_e( 'View the complete history of all integrity scans. Click on a scan to see detailed results.', 'k-integrity-guard' ); ?>
 	</p>
 
 	<form method="post" id="wpig-history-form">
@@ -104,10 +104,10 @@ $table->prepare_items();
 
 	<div class="wpig-history-actions" style="margin-top: 20px;">
 		<form method="post" style="display:inline;">
-			<?php wp_nonce_field( 'wpig_empty_history' ); ?>
-			<input type="hidden" name="wpig_empty_history" value="1" />
-			<button type="submit" class="button button-secondary" onclick="return confirm('<?php echo esc_js( __( 'Are you sure you want to delete all scan history? This action cannot be undone.', 'wp-integrity-guard' ) ); ?>');">
-				<?php esc_html_e( 'Empty History', 'wp-integrity-guard' ); ?>
+			<?php wp_nonce_field( 'kig_empty_history' ); ?>
+			<input type="hidden" name="kig_empty_history" value="1" />
+			<button type="submit" class="button button-secondary" onclick="return confirm('<?php echo esc_js( __( 'Are you sure you want to delete all scan history? This action cannot be undone.', 'k-integrity-guard' ) ); ?>');">
+				<?php esc_html_e( 'Empty History', 'k-integrity-guard' ); ?>
 			</button>
 		</form>
 	</div>

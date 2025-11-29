@@ -10,11 +10,11 @@
 	var isArray = Array.isArray || $.isArray;
 
 	$( function () {
-		if ( typeof window.wpigScan === 'undefined' ) {
+		if ( typeof window.kigScan === 'undefined' ) {
 			return;
 		}
 
-		var settings = window.wpigScan;
+		var settings = window.kigScan;
 		var form = $( '#wpig-scan-form' );
 
 		if ( ! form.length ) {
@@ -47,7 +47,7 @@
 
 			var payload = form.serializeArray();
 
-			payload.push( { name: 'action', value: 'wpig_start_scan' } );
+			payload.push( { name: 'action', value: 'kig_start_scan' } );
 			payload.push( { name: 'nonce', value: settings.nonces.start } );
 
 			$.post( settings.ajaxUrl, payload )
@@ -68,7 +68,7 @@
 			}
 
 			$.post( settings.ajaxUrl, {
-				action: 'wpig_scan_status',
+				action: 'kig_scan_status',
 				nonce: settings.nonces.status,
 				job: state.job,
 			} )

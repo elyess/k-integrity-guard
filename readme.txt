@@ -1,4 +1,4 @@
-=== WP Integrity Guard ===
+=== K'Integrity Guard ===
 Contributors: elyesz
 Donate link: https://github.com/sponsors/elyess
 Tags: security, integrity, malware, checksum, maintenance
@@ -10,7 +10,7 @@ License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 == Description ==
-WP Integrity Guard monitors your WordPress core, plugins, and themes for unexpected file changes. Run scans on demand or let the plugin schedule a daily check so you can catch tampering early.
+K'Integrity Guard monitors your WordPress core, plugins, and themes for unexpected file changes. Run scans on demand or let the plugin schedule a daily check so you can catch tampering early.
 
 = Features =
 * On demand integrity scans for WordPress core, plugins, and themes
@@ -20,9 +20,9 @@ WP Integrity Guard monitors your WordPress core, plugins, and themes for unexpec
 * Highlights modified, missing, and newly added files in scan results
 
 == Installation ==
-1. Upload the plugin files to the /wp-content/plugins/wp-integrity-guard directory, or install through the WordPress Plugins screen.
+1. Upload the plugin files to the /wp-content/plugins/k-integrity-guard directory, or install through the WordPress Plugins screen.
 2. Activate the plugin through the "Plugins" screen in WordPress.
-3. Open "Integrity Guard" in the admin menu to run your first scan and configure settings.
+3. Open "K'Integrity Guard" in the admin menu to run your first scan and configure settings.
 4. (Optional) Enable the daily scan toggle on the Settings tab if you want automated checks.
 
 == Frequently Asked Questions ==

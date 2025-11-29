@@ -2,7 +2,7 @@
 /**
  * WP_List_Table implementation for scan history.
  *
- * @package WP_Integrity_Guard
+ * @package K_Integrity_Guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,14 +16,14 @@ if ( ! class_exists( 'WP_List_Table' ) ) {
 /**
  * Scan history list table.
  */
-class WPIG_History_Table extends WP_List_Table {
+class KIG_History_Table extends WP_List_Table {
 
 	/**
 	 * Text domain for translations.
 	 *
 	 * @var string
 	 */
-	private $textdomain = 'wp-integrity-guard';
+	private $textdomain = 'k-integrity-guard';
 
 	/**
 	 * Constructor.
@@ -87,7 +87,7 @@ class WPIG_History_Table extends WP_List_Table {
 	protected function get_views() {
 		global $wpdb;
 
-		$table_name = WPIG_DB::get_table_name();
+		$table_name = KIG_DB::get_table_name();
 		$current    = isset( $_GET['scan_status'] ) ? sanitize_key( $_GET['scan_status'] ) : 'all'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		// Get counts.
@@ -158,7 +158,7 @@ class WPIG_History_Table extends WP_List_Table {
 			'status'   => $status,
 		);
 
-		$data = WPIG_DB::get_scans( $args );
+		$data = KIG_DB::get_scans( $args );
 
 		$this->items = $data['items'];
 

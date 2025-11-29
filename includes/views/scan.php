@@ -2,10 +2,10 @@
 /**
  * Scan screen template.
  *
- * @var WPIG_Scan     $scan     Scan helper.
- * @var WPIG_Settings $settings Settings handler.
+ * @var KIG_Scan     $scan     Scan helper.
+ * @var KIG_Settings $settings Settings handler.
  *
- * @package WP_Integrity_Guard
+ * @package K_Integrity_Guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,14 +21,14 @@ $defaults = $options['targets'] ?? [];
 	<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 
 	<form id="wpig-scan-form">
-		<?php wp_nonce_field( 'wpig_start_scan', 'wpig_start_scan_nonce' ); ?>
-		<?php wp_nonce_field( 'wpig_scan_status', 'wpig_scan_status_nonce' ); ?>
+		<?php wp_nonce_field( 'kig_start_scan', 'kig_start_scan_nonce' ); ?>
+		<?php wp_nonce_field( 'kig_scan_status', 'kig_scan_status_nonce' ); ?>
 
-		<h2 class="title"><?php esc_html_e( 'Scan Targets', 'wp-integrity-guard' ); ?></h2>
-		<p><?php esc_html_e( 'Override the saved targets for this scan. Leave everything unchecked to use your saved defaults.', 'wp-integrity-guard' ); ?></p>
+		<h2 class="title"><?php esc_html_e( 'Scan Targets', 'k-integrity-guard' ); ?></h2>
+		<p><?php esc_html_e( 'Override the saved targets for this scan. Leave everything unchecked to use your saved defaults.', 'k-integrity-guard' ); ?></p>
 
 		<fieldset>
-			<legend class="screen-reader-text"><?php esc_html_e( 'Scan targets', 'wp-integrity-guard' ); ?></legend>
+			<legend class="screen-reader-text"><?php esc_html_e( 'Scan targets', 'k-integrity-guard' ); ?></legend>
 			<?php foreach ( $targets as $key => $label ) : ?>
 				<label class="selectit">
 					<input
@@ -44,7 +44,7 @@ $defaults = $options['targets'] ?? [];
 
 		<p>
 			<button type="submit" class="button button-primary" id="wpig-start-scan">
-				<?php esc_html_e( 'Start Scan', 'wp-integrity-guard' ); ?>
+				<?php esc_html_e( 'Start Scan', 'k-integrity-guard' ); ?>
 			</button>
 		</p>
 	</form>
@@ -52,7 +52,7 @@ $defaults = $options['targets'] ?? [];
 	<div class="wpig-scan-progress wp-core-ui" aria-live="polite">
 		<progress id="wpig-scan-progress" max="100" value="0"></progress>
 		<p id="wpig-scan-status-text" class="description">
-			<?php esc_html_e( 'Waiting to start…', 'wp-integrity-guard' ); ?>
+			<?php esc_html_e( 'Waiting to start…', 'k-integrity-guard' ); ?>
 		</p>
 	</div>
 

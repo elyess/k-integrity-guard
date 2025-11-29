@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class WPIG_Utils {
+class KIG_Utils {
 
 	/**
 	 * Detect installed plugins and whether they are from WordPress.org.
@@ -146,7 +146,7 @@ class WPIG_Utils {
 	 */
 	public static function checksums_dir() {
 		$uploads = wp_upload_dir();
-		$dir     = trailingslashit( $uploads['basedir'] ) . 'wp-integrity-guard/checksums';
+		$dir     = trailingslashit( $uploads['basedir'] ) . 'k-integrity-guard/checksums';
 		wp_mkdir_p( $dir );
 		return $dir;
 	}
@@ -224,7 +224,7 @@ class WPIG_Utils {
 		}
 		$plugins = get_plugins();
 		if ( ! isset( $plugins[ $plugin_file ] ) ) {
-			return new WP_Error( 'wpig_not_found', __( 'Plugin not found.', 'wp-integrity-guard' ) );
+			return new WP_Error( 'kig_not_found', __( 'Plugin not found.', 'k-integrity-guard' ) );
 		}
 
 		$root = WP_PLUGIN_DIR . '/' . dirname( $plugin_file );
@@ -254,7 +254,7 @@ class WPIG_Utils {
 		$path = self::checksum_path( $plugin_file );
 
 		if ( false === file_put_contents( $path, $json ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
-			return new WP_Error( 'wpig_write_failed', __( 'Failed to write checksum file.', 'wp-integrity-guard' ) );
+			return new WP_Error( 'kig_write_failed', __( 'Failed to write checksum file.', 'k-integrity-guard' ) );
 		}
 
 		return $path;
@@ -383,7 +383,7 @@ class WPIG_Utils {
 	public static function generate_theme_checksum_json( $stylesheet ) {
 		$theme = wp_get_theme( $stylesheet );
 		if ( ! $theme->exists() ) {
-			return new WP_Error( 'wpig_theme_not_found', __( 'Theme not found.', 'wp-integrity-guard' ) );
+			return new WP_Error( 'kig_theme_not_found', __( 'Theme not found.', 'k-integrity-guard' ) );
 		}
 
 		$root = $theme->get_stylesheet_directory();
@@ -413,7 +413,7 @@ class WPIG_Utils {
 		$path = self::theme_checksum_path( $stylesheet );
 
 		if ( false === file_put_contents( $path, $json ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
-			return new WP_Error( 'wpig_write_failed', __( 'Failed to write checksum file.', 'wp-integrity-guard' ) );
+			return new WP_Error( 'kig_write_failed', __( 'Failed to write checksum file.', 'k-integrity-guard' ) );
 		}
 
 		return $path;

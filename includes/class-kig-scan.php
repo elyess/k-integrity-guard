@@ -1,18 +1,18 @@
 <?php
 /**
- * Scan handling for WP Integrity Guard.
+ * Scan handling for K'Integrity Guard.
  *
- * @package WP_Integrity_Guard
+ * @package K_Integrity_Guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class WPIG_Scan {
+class KIG_Scan {
 
-	const JOB_PREFIX = 'wpig_scan_job_';
-	const OPTION_LAST_RESULT = 'wpig_last_scan_result';
+	const JOB_PREFIX = 'kig_scan_job_';
+	const OPTION_LAST_RESULT = 'kig_last_scan_result';
 
 	private const JOB_TTL = 900;
 	private const CORE_CHUNK_SIZE = 75;
@@ -83,28 +83,28 @@ class WPIG_Scan {
 	/**
 	 * Settings handler.
 	 *
-	 * @var WPIG_Settings
+	 * @var KIG_Settings
 	 */
-	private WPIG_Settings $settings;
+	private KIG_Settings $settings;
 
 	/**
 	 * Database handler.
 	 *
-	 * @var WPIG_DB
+	 * @var KIG_DB
 	 */
-	private WPIG_DB $db;
+	private KIG_DB $db;
 
 	/**
 	 * Constructor.
 	 *
 	 * @param string        $plugin_file Main plugin file path.
 	 * @param string        $menu_slug   Scan menu slug.
-	 * @param WPIG_Settings $settings    Settings instance.
+	 * @param KIG_Settings $settings    Settings instance.
 	 * @param string        $textdomain  Text domain.
 	 * @param string        $version     Plugin version.
-	 * @param WPIG_DB       $db          Database handler instance.
+	 * @param KIG_DB       $db          Database handler instance.
 	 */
-	public function __construct( string $plugin_file, string $menu_slug, WPIG_Settings $settings, string $textdomain, string $version, WPIG_DB $db ) {
+	public function __construct( string $plugin_file, string $menu_slug, KIG_Settings $settings, string $textdomain, string $version, KIG_DB $db ) {
 		$this->plugin_file = $plugin_file;
 		$this->menu_slug   = $menu_slug;
 		$this->settings    = $settings;
@@ -113,9 +113,9 @@ class WPIG_Scan {
 		$this->db          = $db;
 
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
-		add_action( 'wp_ajax_wpig_start_scan', array( $this, 'handle_start_scan' ) );
-		add_action( 'wp_ajax_wpig_scan_status', array( $this, 'handle_scan_status' ) );
-		add_action( 'wpig_daily_scan', array( $this, 'run_scheduled_scan' ) );
+		add_action( 'wp_ajax_kig_start_scan', array( $this, 'handle_start_scan' ) );
+		add_action( 'wp_ajax_kig_scan_status', array( $this, 'handle_scan_status' ) );
+		add_action( 'kig_daily_scan', array( $this, 'run_scheduled_scan' ) );
 		add_action( 'init', array( $this, 'maybe_schedule_cron' ) );
 	}
 
@@ -142,8 +142,8 @@ class WPIG_Scan {
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonces'  => array(
-					'start'  => wp_create_nonce( 'wpig_start_scan' ),
-					'status' => wp_create_nonce( 'wpig_scan_status' ),
+					'start'  => wp_create_nonce( 'kig_start_scan' ),
+					'status' => wp_create_nonce( 'kig_scan_status' ),
 				),
 				'defaults' => array(
 					'targets' => $options['targets'],
@@ -216,7 +216,7 @@ class WPIG_Scan {
 			wp_send_json_error( array( 'message' => __( 'Access denied.', $this->textdomain ) ), 403 );
 		}
 
-		check_ajax_referer( 'wpig_start_scan', 'nonce' );
+		check_ajax_referer( 'kig_start_scan', 'nonce' );
 
 		$raw_targets = isset( $_POST['targets'] ) ? (array) wp_unslash( $_POST['targets'] ) : array();
 		$selected    = $this->resolve_targets( $raw_targets );
@@ -241,7 +241,7 @@ class WPIG_Scan {
 			wp_send_json_error( array( 'message' => __( 'Access denied.', $this->textdomain ) ), 403 );
 		}
 
-		check_ajax_referer( 'wpig_scan_status', 'nonce' );
+		check_ajax_referer( 'kig_scan_status', 'nonce' );
 
 		$job_id = isset( $_POST['job'] ) ? sanitize_text_field( wp_unslash( $_POST['job'] ) ) : '';
 
@@ -326,15 +326,15 @@ class WPIG_Scan {
 	public function maybe_schedule_cron(): void {
 		$options   = $this->settings->get_options();
 		$enabled   = ! empty( $options['daily_scan_enabled'] );
-		$timestamp = wp_next_scheduled( 'wpig_daily_scan' );
+		$timestamp = wp_next_scheduled( 'kig_daily_scan' );
 
 		if ( $enabled && false === $timestamp ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'wpig_daily_scan' );
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'kig_daily_scan' );
 			return;
 		}
 
 		if ( ! $enabled && false !== $timestamp ) {
-			wp_unschedule_event( $timestamp, 'wpig_daily_scan' );
+			wp_unschedule_event( $timestamp, 'kig_daily_scan' );
 		}
 	}
 
@@ -766,7 +766,7 @@ class WPIG_Scan {
 
 			if ( 200 !== $code ) {
 				$last_error = new WP_Error(
-					'wpig_http_error',
+					'kig_http_error',
 					sprintf(
 						/* translators: %s: HTTP status code. */
 						__( 'Unexpected response while fetching core checksums (%s).', $this->textdomain ),
@@ -780,17 +780,17 @@ class WPIG_Scan {
 			$data = json_decode( $body, true );
 
 			if ( ! is_array( $data ) ) {
-				$last_error = new WP_Error( 'wpig_invalid_response', __( 'Unable to parse checksum response.', $this->textdomain ) );
+				$last_error = new WP_Error( 'kig_invalid_response', __( 'Unable to parse checksum response.', $this->textdomain ) );
 				continue;
 			}
 
 			if ( empty( $data['checksums'] ) || ! is_array( $data['checksums'] ) ) {
 				if ( isset( $data['error'] ) && is_string( $data['error'] ) ) {
-					$last_error = new WP_Error( 'wpig_remote_error', $data['error'] );
+					$last_error = new WP_Error( 'kig_remote_error', $data['error'] );
 					continue;
 				}
 
-				$last_error = new WP_Error( 'wpig_missing_checksums', __( 'Checksum data was not provided by WordPress.org.', $this->textdomain ) );
+				$last_error = new WP_Error( 'kig_missing_checksums', __( 'Checksum data was not provided by WordPress.org.', $this->textdomain ) );
 				continue;
 			}
 
@@ -800,7 +800,7 @@ class WPIG_Scan {
 			);
 		}
 
-		return $last_error ? $last_error : new WP_Error( 'wpig_checksum_unavailable', __( 'Unable to download WordPress core checksums.', $this->textdomain ) );
+		return $last_error ? $last_error : new WP_Error( 'kig_checksum_unavailable', __( 'Unable to download WordPress core checksums.', $this->textdomain ) );
 	}
 
 	/**
@@ -1164,11 +1164,11 @@ class WPIG_Scan {
 	 * @return true|WP_Error
 	 */
 	private function prepare_plugins_target( array &$state ) {
-		if ( ! class_exists( 'WPIG_Utils' ) ) {
-			return new WP_Error( 'wpig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
+		if ( ! class_exists( 'KIG_Utils' ) ) {
+			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
 		}
 
-		$sources = WPIG_Utils::detect_plugin_sources();
+		$sources = KIG_Utils::detect_plugin_sources();
 		$plugins = array();
 		$order   = array();
 		$skipped = array();
@@ -1334,7 +1334,7 @@ class WPIG_Scan {
 		$name        = $plugin['name'] ?? $plugin_file;
 
 		if ( '' === $plugin_file || '' === $slug || '' === $version ) {
-			return new WP_Error( 'wpig_plugin_data', __( 'Insufficient data to verify plugin.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', $this->textdomain ) );
 		}
 
 		$checksums = $this->fetch_plugin_checksums( $slug, $version );
@@ -1353,7 +1353,7 @@ class WPIG_Scan {
 
 		$map = $this->normalize_checksum_map( $checksums['checksums'], $prefixes );
 		if ( empty( $map ) ) {
-			return new WP_Error( 'wpig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', $this->textdomain ) );
 		}
 
 		$root_info    = $this->determine_plugin_root( $plugin_file, $slug );
@@ -1598,11 +1598,11 @@ class WPIG_Scan {
 	 * @return true|WP_Error
 	 */
 	private function prepare_themes_target( array &$state ) {
-		if ( ! class_exists( 'WPIG_Utils' ) ) {
-			return new WP_Error( 'wpig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
+		if ( ! class_exists( 'KIG_Utils' ) ) {
+			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
 		}
 
-		$sources = WPIG_Utils::detect_theme_sources();
+		$sources = KIG_Utils::detect_theme_sources();
 		$themes  = array();
 		$order   = array();
 		$skipped = array();
@@ -1784,17 +1784,17 @@ class WPIG_Scan {
 		$name       = $theme['name'] ?? $stylesheet;
 
 		if ( '' === $stylesheet || '' === $slug || '' === $version ) {
-			return new WP_Error( 'wpig_theme_data', __( 'Insufficient data to verify theme.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_data', __( 'Insufficient data to verify theme.', $this->textdomain ) );
 		}
 
 		$theme_obj = wp_get_theme( $stylesheet );
 		if ( ! $theme_obj->exists() ) {
-			return new WP_Error( 'wpig_theme_missing', __( 'Theme is not installed.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_missing', __( 'Theme is not installed.', $this->textdomain ) );
 		}
 
 		$root = $theme_obj->get_stylesheet_directory();
 		if ( ! $root || ! is_dir( $root ) ) {
-			return new WP_Error( 'wpig_theme_path', __( 'Theme directory could not be located.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', $this->textdomain ) );
 		}
 
 		$checksums = $this->fetch_theme_checksums( $slug, $version );
@@ -1804,7 +1804,7 @@ class WPIG_Scan {
 
 		$map = $this->normalize_checksum_map( $checksums['checksums'], array( $slug ) );
 		if ( empty( $map ) ) {
-			return new WP_Error( 'wpig_missing_theme_checksums', __( 'Theme checksums were not provided.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_theme_checksums', __( 'Theme checksums were not provided.', $this->textdomain ) );
 		}
 
 		$comparison = $this->compare_extension_files( $root, $map, $checksums['checksum_type'], true );
@@ -1977,7 +1977,7 @@ class WPIG_Scan {
 	 */
 	private function fetch_plugin_checksums( string $slug, string $version ) {
 		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'wpig_plugin_checksum_args', __( 'Invalid plugin checksum request.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_args', __( 'Invalid plugin checksum request.', $this->textdomain ) );
 		}
 
 		return $this->fetch_plugin_checksums_from_downloads( $slug, $version );
@@ -1996,7 +1996,7 @@ class WPIG_Scan {
 			$url,
 			array(
 				'timeout'    => 20,
-				'user-agent' => 'WP Integrity Guard/' . $this->version,
+				'user-agent' => 'K'Integrity Guard/' . $this->version,
 			)
 		);
 
@@ -2007,21 +2007,21 @@ class WPIG_Scan {
 		$code = (int) wp_remote_retrieve_response_code( $request );
 		if ( 200 !== $code ) {
 			if ( 404 === $code ) {
-				return new WP_Error( 'wpig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
+				return new WP_Error( 'kig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
 			}
 
-			return new WP_Error( 'wpig_plugin_checksum_http', __( 'Unable to download plugin checksums.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_http', __( 'Unable to download plugin checksums.', $this->textdomain ) );
 		}
 
 		$body = wp_remote_retrieve_body( $request );
 		$data = json_decode( $body, true );
 
 		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'wpig_plugin_checksum_json', __( 'Unexpected plugin checksum response.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_json', __( 'Unexpected plugin checksum response.', $this->textdomain ) );
 		}
 
 		if ( empty( $data['files'] ) || ! is_array( $data['files'] ) ) {
-			return new WP_Error( 'wpig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
 		}
 
 		return array(
@@ -2039,7 +2039,7 @@ class WPIG_Scan {
 	 */
 	private function fetch_theme_checksums( string $slug, string $version ) {
 		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'wpig_theme_checksum_args', __( 'Invalid theme checksum request.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_args', __( 'Invalid theme checksum request.', $this->textdomain ) );
 		}
 
 		$url = sprintf( 'https://api.wordpress.org/themes/checksums/1.0/%1$s/%2$s', rawurlencode( $slug ), rawurlencode( $version ) );
@@ -2054,7 +2054,7 @@ class WPIG_Scan {
 			$url,
 			array(
 				'timeout'   => 20,
-				'user-agent' => 'WP Integrity Guard/' . $this->version,
+				'user-agent' => 'K'Integrity Guard/' . $this->version,
 			)
 		);
 
@@ -2064,22 +2064,22 @@ class WPIG_Scan {
 
 		$code = (int) wp_remote_retrieve_response_code( $request );
 		if ( 200 !== $code ) {
-			return new WP_Error( 'wpig_theme_checksum_http', __( 'Unable to download theme checksums.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_http', __( 'Unable to download theme checksums.', $this->textdomain ) );
 		}
 
 		$body = wp_remote_retrieve_body( $request );
 		$data = json_decode( $body, true );
 
 		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'wpig_theme_checksum_json', __( 'Unexpected theme checksum response.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_json', __( 'Unexpected theme checksum response.', $this->textdomain ) );
 		}
 
 		if ( empty( $data['checksums'] ) || ! is_array( $data['checksums'] ) ) {
 			if ( isset( $data['error'] ) && is_string( $data['error'] ) ) {
-				return new WP_Error( 'wpig_theme_checksum_error', $data['error'] );
+				return new WP_Error( 'kig_theme_checksum_error', $data['error'] );
 			}
 
-			return new WP_Error( 'wpig_theme_checksum_missing', __( 'Theme checksums were not provided by WordPress.org.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_missing', __( 'Theme checksums were not provided by WordPress.org.', $this->textdomain ) );
 		}
 
 		$type = isset( $data['checksum_type'] ) ? strtolower( (string) $data['checksum_type'] ) : 'md5';
@@ -2654,11 +2654,11 @@ class WPIG_Scan {
 	 * @return true|WP_Error
 	 */
 	private function prepare_third_party_plugins_target( array &$state ) {
-		if ( ! class_exists( 'WPIG_Utils' ) ) {
-			return new WP_Error( 'wpig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
+		if ( ! class_exists( 'KIG_Utils' ) ) {
+			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
 		}
 
-		$sources  = WPIG_Utils::detect_plugin_sources();
+		$sources  = KIG_Utils::detect_plugin_sources();
 		$settings = $this->settings->get_options();
 		$ignores  = $settings['third_party']['ignore'] ?? array();
 		$plugins  = array();
@@ -2684,7 +2684,7 @@ continue;
 }
 
 // Skip if no checksum snapshot exists.
-if ( WPIG_Utils::checksum_is_stale( $plugin_file ) ) {
+if ( KIG_Utils::checksum_is_stale( $plugin_file ) ) {
 $skipped[] = array(
 'plugin' => $plugin_file,
 'name'   => $name,
@@ -2811,13 +2811,13 @@ $plugin_file = $plugin['plugin_file'] ?? '';
 $name        = $plugin['name'] ?? $plugin_file;
 
 if ( '' === $plugin_file ) {
-return new WP_Error( 'wpig_plugin_data', __( 'Insufficient data to verify plugin.', $this->textdomain ) );
+return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', $this->textdomain ) );
 }
 
 // Load checksum snapshot.
-$checksums_data = WPIG_Utils::read_plugin_checksum_json( $plugin_file );
+$checksums_data = KIG_Utils::read_plugin_checksum_json( $plugin_file );
 if ( ! $checksums_data || empty( $checksums_data['files'] ) ) {
-return new WP_Error( 'wpig_no_checksum', __( 'No checksum snapshot available.', $this->textdomain ) );
+return new WP_Error( 'kig_no_checksum', __( 'No checksum snapshot available.', $this->textdomain ) );
 }
 
 // Determine plugin root directory.
@@ -2829,7 +2829,7 @@ $root = trailingslashit( WP_PLUGIN_DIR ) . $base;
 }
 
 if ( ! is_dir( $root ) ) {
-return new WP_Error( 'wpig_plugin_path', __( 'Plugin directory could not be located.', $this->textdomain ) );
+return new WP_Error( 'kig_plugin_path', __( 'Plugin directory could not be located.', $this->textdomain ) );
 }
 
 // Compare files against snapshot.

@@ -1,13 +1,13 @@
 <?php
 /**
- * Plugin Name: WP Integrity Guard
+ * Plugin Name: K'Integrity Guard
  * Description: Monitors and protects your WordPress core files, themes, and plugins from unauthorized changes.
  * Version: 1.1.0
  * Author: Elyes Zouaghi
- * Author URI: https://github.com/elyess/wp-integrity-guard
+ * Author URI: https://github.com/elyess/k-integrity-guard
  * License: GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain: wp-integrity-guard
+ * Text Domain: k-integrity-guard
  * Domain Path: /languages
  */
 
@@ -15,35 +15,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-require_once __DIR__ . '/includes/class-wpig-settings.php';
-require_once __DIR__ . '/includes/class-wpig-utils.php';
-require_once __DIR__ . '/includes/class-wpig-db.php';
-require_once __DIR__ . '/includes/class-wpig-scan.php';
-require_once __DIR__ . '/includes/class-wpig-history-table.php';
+require_once __DIR__ . '/includes/class-kig-settings.php';
+require_once __DIR__ . '/includes/class-kig-utils.php';
+require_once __DIR__ . '/includes/class-kig-db.php';
+require_once __DIR__ . '/includes/class-kig-scan.php';
+require_once __DIR__ . '/includes/class-kig-history-table.php';
 
-class WP_Integrity_Guard {
+class K_Integrity_Guard {
 
 	const VERSION = '1.1.0';
-	const TEXTDOMAIN = 'wp-integrity-guard';
+	const TEXTDOMAIN = 'k-integrity-guard';
 
 	const CAPABILITY = 'manage_options';
 
-	//const SLUG_PLUGIN = 'wp_integrity_guard';
-	const SLUG_SCAN = 'wp_integrity_guard_scan';
-	const SLUG_SETTINGS = 'wp_integrity_guard_settings';
-	const SLUG_HISTORY = 'wp_integrity_guard_history';
+	//const SLUG_PLUGIN = 'k_integrity_guard';
+	const SLUG_SCAN = 'k_integrity_guard_scan';
+	const SLUG_SETTINGS = 'k_integrity_guard_settings';
+	const SLUG_HISTORY = 'k_integrity_guard_history';
 
 	private string $plugin_file;
 
-	private WPIG_Settings $settings;
-	private WPIG_Scan $scan;
-	private WPIG_DB $db;
+	private KIG_Settings $settings;
+	private KIG_Scan $scan;
+	private KIG_DB $db;
 
 	public function __construct() {
 		$this->plugin_file = __FILE__;
-		$this->settings = new WPIG_Settings();
-		$this->db = new WPIG_DB();
-		$this->scan = new WPIG_Scan( $this->plugin_file, self::SLUG_SCAN, $this->settings, self::TEXTDOMAIN, self::VERSION, $this->db );
+		$this->settings = new KIG_Settings();
+		$this->db = new KIG_DB();
+		$this->scan = new KIG_Scan( $this->plugin_file, self::SLUG_SCAN, $this->settings, self::TEXTDOMAIN, self::VERSION, $this->db );
 		add_action('admin_menu', [$this, 'register_admin_menu']);
 		add_filter('plugin_action_links_' . plugin_basename($this->plugin_file), [$this, 'plugin_action_links']);
 		add_action('admin_notices',        [$this, 'show_first_scan_notice']);
@@ -58,17 +58,17 @@ class WP_Integrity_Guard {
 			add_action('admin_notices', [$this, 'show_changed_themes_notice']);
 
 // Handle the AJAX dismissal (admins only)
-add_action('wp_ajax_wpig_dismiss_first_scan_notice', function () {
+add_action('wp_ajax_kig_dismiss_first_scan_notice', function () {
     if (!current_user_can('manage_options')) {
         wp_send_json_error(['message' => 'forbidden'], 403);
     }
-    check_ajax_referer('wpig_dismiss_first_scan_notice', 'nonce');
+    check_ajax_referer('kig_dismiss_first_scan_notice', 'nonce');
 
     // Flip the global flag off
     if (is_multisite() && function_exists('is_plugin_active_for_network') && is_plugin_active_for_network(plugin_basename(__FILE__))) {
-        update_site_option('wpig_show_first_scan_notice', 'no');
+        update_site_option('kig_show_first_scan_notice', 'no');
     } else {
-        update_option('wpig_show_first_scan_notice', 'no');
+        update_option('kig_show_first_scan_notice', 'no');
     }
 
     wp_send_json_success();
@@ -78,19 +78,19 @@ add_action('wp_ajax_wpig_dismiss_first_scan_notice', function () {
 add_action('admin_enqueue_scripts', function ($hook) {
     // Only enqueue if the flag is on to avoid noise
     $flag = is_multisite() && is_plugin_active_for_network(plugin_basename(__FILE__))
-        ? get_site_option('wpig_show_first_scan_notice', 'no')
-        : get_option('wpig_show_first_scan_notice', 'no');
+        ? get_site_option('kig_show_first_scan_notice', 'no')
+        : get_option('kig_show_first_scan_notice', 'no');
 
     if ($flag !== 'yes') return;
 
     wp_add_inline_script(
         'jquery-core', // ensure jQuery loaded first; or register your own handle
         "(function($){
-            $(document).on('click', '.wpig-first-scan-notice .notice-dismiss', function(){
-                var \$n = $(this).closest('.wpig-first-scan-notice');
+            $(document).on('click', '.kig-first-scan-notice .notice-dismiss', function(){
+                var \$n = $(this).closest('.kig-first-scan-notice');
                 var nonce = \$n.data('nonce');
                 $.post(ajaxurl, {
-                    action: 'wpig_dismiss_first_scan_notice',
+                    action: 'kig_dismiss_first_scan_notice',
                     nonce: nonce
                 });
             });
@@ -101,7 +101,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
 	public function register_admin_menu() {
 		add_menu_page(
-			__('WP Integrity Guard', self::TEXTDOMAIN),
+			__('K'Integrity Guard', self::TEXTDOMAIN),
 			__('Integrity Guard', self::TEXTDOMAIN),
 			self::CAPABILITY,
 			self::SLUG_SCAN,
@@ -170,16 +170,16 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
 private function get_global_notice_flag() {
     if (is_multisite() && $this->is_network_active()) {
-        return get_site_option('wpig_show_first_scan_notice', 'no');
+        return get_site_option('kig_show_first_scan_notice', 'no');
     }
-    return get_option('wpig_show_first_scan_notice', 'no');
+    return get_option('kig_show_first_scan_notice', 'no');
 }
 
 private function set_global_notice_flag($value) {
     if (is_multisite() && $this->is_network_active()) {
-        return update_site_option('wpig_show_first_scan_notice', $value);
+        return update_site_option('kig_show_first_scan_notice', $value);
     }
-    return update_option('wpig_show_first_scan_notice', $value);
+    return update_option('kig_show_first_scan_notice', $value);
 }
 
 // Simple network-active check (works in most plugin setups)
@@ -204,10 +204,10 @@ public function show_first_scan_notice() {
     $settings_url = admin_url('admin.php?page=' . self::SLUG_SETTINGS);
 
     // Security nonce for AJAX dismiss
-    $nonce = wp_create_nonce('wpig_dismiss_first_scan_notice');
+    $nonce = wp_create_nonce('kig_dismiss_first_scan_notice');
 
-    echo '<div class="notice notice-info is-dismissible wpig-first-scan-notice" data-nonce="' . esc_attr($nonce) . '">';
-    echo '<p><strong>' . esc_html__('WP Integrity Guard is active.', self::TEXTDOMAIN) . '</strong></p>';
+    echo '<div class="notice notice-info is-dismissible kig-first-scan-notice" data-nonce="' . esc_attr($nonce) . '">';
+    echo '<p><strong>' . esc_html__('K'Integrity Guard is active.', self::TEXTDOMAIN) . '</strong></p>';
     echo '<p>' . esc_html__('You can run your first scan now or review the scan settings.', self::TEXTDOMAIN) . '</p>';
     echo '<p>';
     echo '<a href="' . esc_url($scan_url) . '" class="button button-primary">' . esc_html__('Run first scan', self::TEXTDOMAIN) . '</a> ';
@@ -227,22 +227,22 @@ public function capture_plugin_changes($upgrader, $hook_extra) {
     }
     if (empty($changed)) return;
 
-    $existing = get_transient('wpig_changed_plugins');
+    $existing = get_transient('kig_changed_plugins');
     if (!is_array($existing)) $existing = [];
 	    $merged = array_values(array_unique(array_merge($existing, $changed)));
-	    set_transient('wpig_changed_plugins', $merged, HOUR_IN_SECONDS);
+	    set_transient('kig_changed_plugins', $merged, HOUR_IN_SECONDS);
 	}
 
 /** Remove checksum JSON when a plugin is deleted. */
 public function handle_deleted_plugin($plugin_file, $deleted) {
     if (!$deleted) return;
-    if (class_exists('WPIG_Utils')) {
-        WPIG_Utils::delete_checksum_file($plugin_file);
+    if (class_exists('KIG_Utils')) {
+        KIG_Utils::delete_checksum_file($plugin_file);
     }
-    $existing = get_transient('wpig_changed_plugins');
+    $existing = get_transient('kig_changed_plugins');
     if (is_array($existing)) {
         $existing = array_diff($existing, [$plugin_file]);
-        set_transient('wpig_changed_plugins', $existing, HOUR_IN_SECONDS);
+        set_transient('kig_changed_plugins', $existing, HOUR_IN_SECONDS);
     }
 }
 
@@ -250,23 +250,23 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	public function show_changed_plugins_notice() {
 	    if (!current_user_can('manage_options')) return;
 
-    $changed = get_transient('wpig_changed_plugins');
+    $changed = get_transient('kig_changed_plugins');
     if (empty($changed) || !is_array($changed)) return;
 
     // Respect ignores and only third-party.
-    $opts = get_option(WPIG_Settings::OPTION, []);
+    $opts = get_option(KIG_Settings::OPTION, []);
     $ignores = $opts['third_party']['ignore'] ?? [];
 
-    if (!class_exists('WPIG_Utils')) {
-        require_once __DIR__ . '/includes/class-wpig-utils.php';
+    if (!class_exists('KIG_Utils')) {
+        require_once __DIR__ . '/includes/class-kig-utils.php';
     }
-    $sources = WPIG_Utils::detect_plugin_sources();
+    $sources = KIG_Utils::detect_plugin_sources();
 
     $todo = [];
     foreach ($changed as $file) {
         if (!empty($ignores[$file])) continue;
         if (empty($sources[$file]) || !empty($sources[$file]['is_wporg'])) continue;
-        if (WPIG_Utils::checksum_is_stale($file)) {
+        if (KIG_Utils::checksum_is_stale($file)) {
             $todo[] = $file;
         }
     }
@@ -300,22 +300,22 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	    }
 	    if (empty($changed)) return;
 
-	    $existing = get_transient('wpig_changed_themes');
+	    $existing = get_transient('kig_changed_themes');
 	    if (!is_array($existing)) $existing = [];
 	    $merged = array_values(array_unique(array_merge($existing, $changed)));
-	    set_transient('wpig_changed_themes', $merged, HOUR_IN_SECONDS);
+	    set_transient('kig_changed_themes', $merged, HOUR_IN_SECONDS);
 	}
 
 	/** Remove checksum JSON when a theme is deleted. */
 	public function handle_deleted_theme($stylesheet, $deleted, $theme) {
 	    if (!$deleted) return;
-	    if (class_exists('WPIG_Utils')) {
-	        WPIG_Utils::delete_theme_checksum_file($stylesheet);
+	    if (class_exists('KIG_Utils')) {
+	        KIG_Utils::delete_theme_checksum_file($stylesheet);
 	    }
-	    $existing = get_transient('wpig_changed_themes');
+	    $existing = get_transient('kig_changed_themes');
 	    if (is_array($existing)) {
 	        $existing = array_diff($existing, [$stylesheet]);
-	        set_transient('wpig_changed_themes', $existing, HOUR_IN_SECONDS);
+	        set_transient('kig_changed_themes', $existing, HOUR_IN_SECONDS);
 	    }
 	}
 
@@ -323,22 +323,22 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	public function show_changed_themes_notice() {
 	    if (!current_user_can('manage_options')) return;
 
-	    $changed = get_transient('wpig_changed_themes');
+	    $changed = get_transient('kig_changed_themes');
 	    if (empty($changed) || !is_array($changed)) return;
 
-	    $opts = get_option(WPIG_Settings::OPTION, []);
+	    $opts = get_option(KIG_Settings::OPTION, []);
 	    $ignores = $opts['third_party_themes']['ignore'] ?? [];
 
-	    if (!class_exists('WPIG_Utils')) {
-	        require_once __DIR__ . '/includes/class-wpig-utils.php';
+	    if (!class_exists('KIG_Utils')) {
+	        require_once __DIR__ . '/includes/class-kig-utils.php';
 	    }
-	    $sources = WPIG_Utils::detect_theme_sources();
+	    $sources = KIG_Utils::detect_theme_sources();
 
 	    $todo = [];
 	    foreach ($changed as $stylesheet) {
 	        if (!empty($ignores[$stylesheet])) continue;
 	        if (empty($sources[$stylesheet]) || !empty($sources[$stylesheet]['is_wporg'])) continue;
-	        if (WPIG_Utils::theme_checksum_is_stale($stylesheet)) {
+	        if (KIG_Utils::theme_checksum_is_stale($stylesheet)) {
 	            $todo[] = $stylesheet;
 	        }
 	    }
@@ -366,17 +366,17 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 add_action(
 	'plugins_loaded',
 	static function () {
-		new WP_Integrity_Guard();
+		new K_Integrity_Guard();
 	}
 );
 
 register_activation_hook(__FILE__, function ($network_wide) {
     if (is_multisite() && $network_wide) {
-        update_site_option('wpig_show_first_scan_notice', 'yes');
+        update_site_option('kig_show_first_scan_notice', 'yes');
     } else {
-        update_option('wpig_show_first_scan_notice', 'yes');
+        update_option('kig_show_first_scan_notice', 'yes');
     }
     
     // Create scan history table.
-    WPIG_DB::create_table();
+    KIG_DB::create_table();
 });
