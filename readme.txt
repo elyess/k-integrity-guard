@@ -9,6 +9,8 @@ Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
+K'Integrity Guard monitors your WordPress core, plugins, and themes for unexpected file changes.
+
 == Description ==
 K'Integrity Guard monitors your WordPress core, plugins, and themes for unexpected file changes. Run scans on demand or let the plugin schedule a daily check so you can catch tampering early.
 

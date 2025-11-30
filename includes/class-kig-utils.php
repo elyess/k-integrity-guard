@@ -170,7 +170,7 @@ class KIG_Utils {
 	public static function delete_checksum_file( $plugin_file ) {
 		$path = self::checksum_path( $plugin_file );
 		if ( file_exists( $path ) ) {
-			@unlink( $path );
+			wp_delete_file( $path );
 		}
 	}
 
@@ -344,7 +344,7 @@ class KIG_Utils {
 	public static function delete_theme_checksum_file( $stylesheet ) {
 		$path = self::theme_checksum_path( $stylesheet );
 		if ( file_exists( $path ) ) {
-			@unlink( $path );
+			wp_delete_file( $path );
 		}
 	}
 

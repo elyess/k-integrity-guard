@@ -82,14 +82,10 @@ class KIG_History_Table extends WP_List_Table {
 	protected function get_views() {
 		global $wpdb;
 
-		$table_name = KIG_DB::get_table_name();
 		$current    = isset( $_GET['scan_status'] ) ? sanitize_key( $_GET['scan_status'] ) : 'all'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		// Get counts.
-		$all_count     = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$success_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name} WHERE status = %s", 'success' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$warning_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name} WHERE status = %s", 'warning' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$error_count   = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name} WHERE status = %s", 'error' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$counts = KIG_DB::get_scan_counts();
 
 		$views = array(
 			'all' => sprintf(
@@ -97,37 +93,37 @@ class KIG_History_Table extends WP_List_Table {
 				esc_url( remove_query_arg( 'scan_status' ) ),
 				'all' === $current ? 'current' : '',
 				esc_html__( 'All', 'k-integrity-guard' ),
-				(int) $all_count
+				$counts['all']
 			),
 		);
 
-		if ( $success_count > 0 ) {
+		if ( $counts['success'] > 0 ) {
 			$views['success'] = sprintf(
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( add_query_arg( 'scan_status', 'success' ) ),
 				'success' === $current ? 'current' : '',
 				esc_html__( 'Success', 'k-integrity-guard' ),
-				(int) $success_count
+				$counts['success']
 			);
 		}
 
-		if ( $warning_count > 0 ) {
+		if ( $counts['warning'] > 0 ) {
 			$views['warning'] = sprintf(
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( add_query_arg( 'scan_status', 'warning' ) ),
 				'warning' === $current ? 'current' : '',
 				esc_html__( 'Warnings', 'k-integrity-guard' ),
-				(int) $warning_count
+				$counts['warning']
 			);
 		}
 
-		if ( $error_count > 0 ) {
+		if ( $counts['error'] > 0 ) {
 			$views['error'] = sprintf(
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( add_query_arg( 'scan_status', 'error' ) ),
 				'error' === $current ? 'current' : '',
 				esc_html__( 'Errors', 'k-integrity-guard' ),
-				(int) $error_count
+				$counts['error']
 			);
 		}
 

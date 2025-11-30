@@ -57,22 +57,8 @@ class K_Integrity_Guard {
 			add_action('deleted_theme', [$this, 'handle_deleted_theme'], 10, 3);
 			add_action('admin_notices', [$this, 'show_changed_themes_notice']);
 
-// Handle the AJAX dismissal (admins only)
-add_action('wp_ajax_kig_dismiss_first_scan_notice', function () {
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'forbidden'], 403);
-    }
-    check_ajax_referer('kig_dismiss_first_scan_notice', 'nonce');
-
-    // Flip the global flag off
-    if (is_multisite() && function_exists('is_plugin_active_for_network') && is_plugin_active_for_network(plugin_basename(__FILE__))) {
-        update_site_option('kig_show_first_scan_notice', 'no');
-    } else {
-        update_option('kig_show_first_scan_notice', 'no');
-    }
-
-    wp_send_json_success();
-});
+		// Handle the AJAX dismissal (admins only)
+		add_action('wp_ajax_kig_dismiss_first_scan_notice', [$this, 'dismiss_first_scan_notice']);
 
 // Load a tiny JS when we might show the notice (cheap guard)
 add_action('admin_enqueue_scripts', function ($hook) {
@@ -149,14 +135,14 @@ add_action('admin_enqueue_scripts', function ($hook) {
 	}
 
 	public function render_scan_page(): void {
-			if (!current_user_can(self::CAPABILITY)) wp_die(__('You do not have permission.', 'k-integrity-guard'));
+			if (!current_user_can(self::CAPABILITY)) wp_die(esc_html__('You do not have permission.', 'k-integrity-guard'));
 			$scan = $this->scan;
 			$settings = $this->settings;
 			include __DIR__ . '/includes/views/scan.php';
 	}
 
 	public function render_history_page(): void {
-			if (!current_user_can(self::CAPABILITY)) wp_die(__('You do not have permission.', 'k-integrity-guard'));
+			if (!current_user_can(self::CAPABILITY)) wp_die(esc_html__('You do not have permission.', 'k-integrity-guard'));
 			include __DIR__ . '/includes/views/history.php';
 	}
 
@@ -191,14 +177,30 @@ private function is_network_active() {
     return is_multisite() && is_plugin_active_for_network(plugin_basename(__FILE__));
 }
 
-public function show_first_scan_notice() {
+	public function dismiss_first_scan_notice() {
+		if (!current_user_can('manage_options')) {
+			wp_send_json_error(['message' => 'forbidden'], 403);
+		}
+		check_ajax_referer('kig_dismiss_first_scan_notice', 'nonce');
+
+		// Flip the global flag off
+		if ($this->is_network_active()) {
+			update_site_option('kig_show_first_scan_notice', 'no');
+		} else {
+			update_option('kig_show_first_scan_notice', 'no');
+		}
+
+		wp_send_json_success();
+	}
+
+	public function show_first_scan_notice() {
     if (!current_user_can('manage_options')) return;
 
     // Only show if still globally enabled
     if ($this->get_global_notice_flag() !== 'yes') return;
 
     // Skip on the scan page itself
-    if (isset($_GET['page']) && $_GET['page'] === self::SLUG_SCAN) return;
+    if (isset($_GET['page']) && sanitize_key($_GET['page']) === self::SLUG_SCAN) return;
 
     $scan_url     = add_query_arg(['page' => self::SLUG_SCAN, 'run_first_scan' => 1], admin_url('admin.php'));
     $settings_url = admin_url('admin.php?page=' . self::SLUG_SETTINGS);

@@ -219,7 +219,7 @@ class KIG_Scan {
 
 		check_ajax_referer( 'kig_start_scan', 'nonce' );
 
-		$raw_targets = isset( $_POST['targets'] ) ? (array) wp_unslash( $_POST['targets'] ) : array();
+		$raw_targets = isset( $_POST['targets'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['targets'] ) ) : array();
 		$selected    = $this->resolve_targets( $raw_targets );
 
 		$job_id = wp_generate_uuid4();

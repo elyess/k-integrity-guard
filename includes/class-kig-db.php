@@ -22,7 +22,23 @@ class KIG_DB {
 	/**
 	 * Option name for storing database version.
 	 */
+	/**
+	 * Option name for storing database version.
+	 */
 	const DB_VERSION_OPTION = 'kig_db_version';
+
+	/**
+	 * Cache group for scan counts.
+	 */
+	/**
+	 * Cache group for scan counts.
+	 */
+	const CACHE_GROUP = 'kig_scan_counts';
+
+	/**
+	 * Cache group for scan objects.
+	 */
+	const CACHE_GROUP_SCANS = 'kig_scans';
 
 	/**
 	 * Get the full table name with WordPress prefix.
@@ -128,6 +144,9 @@ class KIG_DB {
 			return false;
 		}
 
+		wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
+		self::increment_last_changed();
+
 		return $wpdb->insert_id;
 	}
 
@@ -165,6 +184,14 @@ class KIG_DB {
 
 		$args = wp_parse_args( $args, $defaults );
 
+		$last_changed = self::get_last_changed();
+		$key          = md5( serialize( $args ) . $last_changed );
+		$cached       = wp_cache_get( $key, self::CACHE_GROUP_SCANS );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$table_name = self::get_table_name();
 		$per_page   = absint( $args['per_page'] );
 		$page       = absint( $args['page'] );
@@ -178,27 +205,40 @@ class KIG_DB {
 			$orderby = 'scan_date';
 		}
 
+		// Escape for query usage
+		$table_name_esc = esc_sql( $table_name );
+		$orderby_esc    = esc_sql( $orderby );
+
 		$where = array( '1=1' );
+		$query_args = array();
 
 		if ( ! empty( $args['status'] ) ) {
-			$where[] = $wpdb->prepare( 'status = %s', sanitize_key( $args['status'] ) );
+			$where[] = 'status = %s';
+			$query_args[] = sanitize_key( $args['status'] );
 		}
 
 		if ( ! empty( $args['context'] ) ) {
-			$where[] = $wpdb->prepare( 'context = %s', sanitize_key( $args['context'] ) );
+			$where[] = 'context = %s';
+			$query_args[] = sanitize_key( $args['context'] );
 		}
 
 		$where_clause = implode( ' AND ', $where );
 
 		// Get total count.
-		$total = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE {$where_clause}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( ! empty( $query_args ) ) {
+			$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}", $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		} else {
+			$total = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
 
 		// Get paginated results.
+		$query_args[] = $per_page;
+		$query_args[] = $offset;
+
 		$items = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table_name} WHERE {$where_clause} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$per_page,
-				$offset
+				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$query_args
 			),
 			ARRAY_A
 		);
@@ -211,10 +251,14 @@ class KIG_DB {
 			}
 		}
 
-		return array(
+		$result = array(
 			'items' => $items,
 			'total' => (int) $total,
 		);
+
+		wp_cache_set( $key, $result, self::CACHE_GROUP_SCANS );
+
+		return $result;
 	}
 
 	/**
@@ -231,9 +275,14 @@ class KIG_DB {
 			return null;
 		}
 
+		$cached = wp_cache_get( 'scan_' . $scan_id, self::CACHE_GROUP_SCANS );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$table_name = self::get_table_name();
 		$scan       = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table_name} WHERE id = %d", $scan_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare( "SELECT * FROM " . esc_sql( $table_name ) . " WHERE id = %d", $scan_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			ARRAY_A
 		);
 
@@ -244,6 +293,8 @@ class KIG_DB {
 		// Decode JSON fields.
 		$scan['targets'] = json_decode( $scan['targets'], true );
 		$scan['results'] = json_decode( $scan['results'], true );
+
+		wp_cache_set( 'scan_' . $scan_id, $scan, self::CACHE_GROUP_SCANS );
 
 		return $scan;
 	}
@@ -268,7 +319,14 @@ class KIG_DB {
 			array( '%d' )
 		);
 
-		return false !== $result;
+		if ( false !== $result ) {
+			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
+			wp_cache_delete( 'scan_' . $scan_id, self::CACHE_GROUP_SCANS );
+			self::increment_last_changed();
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -286,15 +344,28 @@ class KIG_DB {
 
 		$scan_ids     = array_map( 'absint', $scan_ids );
 		$scan_ids     = array_filter( $scan_ids );
+
+		if ( empty( $scan_ids ) ) {
+			return 0;
+		}
+
 		$placeholders = implode( ',', array_fill( 0, count( $scan_ids ), '%d' ) );
 		$table_name   = self::get_table_name();
 
 		$result = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$table_name} WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM " . esc_sql( $table_name ) . " WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				...$scan_ids
 			)
 		);
+
+		if ( false !== $result ) {
+			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
+			foreach ( $scan_ids as $id ) {
+				wp_cache_delete( 'scan_' . $id, self::CACHE_GROUP_SCANS );
+			}
+			self::increment_last_changed();
+		}
 
 		return false !== $result ? (int) $result : 0;
 	}
@@ -308,7 +379,12 @@ class KIG_DB {
 		global $wpdb;
 
 		$table_name = self::get_table_name();
-		$result     = $wpdb->query( "TRUNCATE TABLE {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$result     = $wpdb->query( "TRUNCATE TABLE " . esc_sql( $table_name ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( false !== $result ) {
+			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
+			self::increment_last_changed();
+		}
 
 		return false !== $result ? (int) $result : 0;
 	}
@@ -328,11 +404,84 @@ class KIG_DB {
 
 		$result = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$table_name} WHERE scan_date < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM " . esc_sql( $table_name ) . " WHERE scan_date < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$date
 			)
 		);
 
+		if ( false !== $result ) {
+			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
+			self::increment_last_changed();
+		}
+
 		return false !== $result ? (int) $result : 0;
+	}
+
+	/**
+	 * Get scan counts by status.
+	 *
+	 * @return array<string,int> Counts keyed by status (all, success, warning, error).
+	 */
+	public static function get_scan_counts() {
+		$counts = wp_cache_get( 'scan_counts', self::CACHE_GROUP );
+
+		if ( false !== $counts ) {
+			return $counts;
+		}
+
+		global $wpdb;
+		$table_name = self::get_table_name();
+
+		$results = $wpdb->get_results(
+			"SELECT status, COUNT(*) as count FROM " . esc_sql( $table_name ) . " GROUP BY status", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+
+		$counts = array(
+			'all'     => 0,
+			'success' => 0,
+			'warning' => 0,
+			'error'   => 0,
+		);
+
+		if ( ! empty( $results ) ) {
+			foreach ( $results as $row ) {
+				$status = $row['status'];
+				$count  = (int) $row['count'];
+
+				if ( isset( $counts[ $status ] ) ) {
+					$counts[ $status ] = $count;
+				}
+
+				$counts['all'] += $count;
+			}
+		}
+
+		wp_cache_set( 'scan_counts', $counts, self::CACHE_GROUP );
+
+		return $counts;
+	}
+
+	/**
+	 * Get the last changed timestamp for the scans group.
+	 *
+	 * @return string Last changed timestamp.
+	 */
+	private static function get_last_changed() {
+		$last_changed = wp_cache_get( 'last_changed', self::CACHE_GROUP_SCANS );
+
+		if ( ! $last_changed ) {
+			$last_changed = microtime();
+			wp_cache_set( 'last_changed', $last_changed, self::CACHE_GROUP_SCANS );
+		}
+
+		return $last_changed;
+	}
+
+	/**
+	 * Increment the last changed timestamp to invalidate list caches.
+	 */
+	private static function increment_last_changed() {
+		wp_cache_set( 'last_changed', microtime(), self::CACHE_GROUP_SCANS );
 	}
 }
