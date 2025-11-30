@@ -66,12 +66,7 @@ class KIG_Scan {
 	 */
 	private string $menu_slug;
 
-	/**
-	 * Text domain for translations.
-	 *
-	 * @var string
-	 */
-	private string $textdomain;
+
 
 	/**
 	 * Plugin version string.
@@ -104,11 +99,10 @@ class KIG_Scan {
 	 * @param string        $version     Plugin version.
 	 * @param KIG_DB       $db          Database handler instance.
 	 */
-	public function __construct( string $plugin_file, string $menu_slug, KIG_Settings $settings, string $textdomain, string $version, KIG_DB $db ) {
+	public function __construct( string $plugin_file, string $menu_slug, KIG_Settings $settings, string $version, KIG_DB $db ) {
 		$this->plugin_file = $plugin_file;
 		$this->menu_slug   = $menu_slug;
 		$this->settings    = $settings;
-		$this->textdomain  = $textdomain;
 		$this->version     = $version;
 		$this->db          = $db;
 
@@ -150,30 +144,37 @@ class KIG_Scan {
 				),
 				'lastScan' => $this->get_last_scan_summary(),
 				'text'     => array(
-					'progressIdle'       => esc_html__( 'Waiting to start…', $this->textdomain ),
-					'progressPreparing'  => esc_html__( 'Preparing scan…', $this->textdomain ),
-					'progressFinalizing' => esc_html__( 'Wrapping up scan…', $this->textdomain ),
-					'progressCompleted'  => esc_html__( 'Scan completed.', $this->textdomain ),
-					'noIssues'           => esc_html__( 'No integrity issues detected.', $this->textdomain ),
-					'issuesFound'        => esc_html__( 'Integrity issues detected.', $this->textdomain ),
-					'errorMessage'       => esc_html__( 'Unable to continue the scan. Please try again.', $this->textdomain ),
-					'lookAtSummary'      => esc_html__( 'Review the scan summary below for details.', $this->textdomain ),
-					'viewLastSummary'    => esc_html__( 'Last scan summary:', $this->textdomain ),
-					'lastRunLabel'       => esc_html__( 'Completed on %s', $this->textdomain ),
-					'buttonStart'        => esc_html__( 'Start Scan', $this->textdomain ),
-					'buttonWorking'      => esc_html__( 'Starting…', $this->textdomain ),
-					'modifiedTitle'      => esc_html__( 'Modified files (%d)', $this->textdomain ),
-					'missingTitle'       => esc_html__( 'Missing files (%d)', $this->textdomain ),
-					'addedTitle'         => esc_html__( 'Unexpected files (%d)', $this->textdomain ),
-					'coreHeading'        => esc_html__( 'WordPress Core', $this->textdomain ),
-					'pluginsHeading'     => esc_html__( 'Plugins', $this->textdomain ),
-					'themesHeading'      => esc_html__( 'Themes', $this->textdomain ),
-					'skippedLabel'       => esc_html__( 'Skipped (%d)', $this->textdomain ),
-					'errorsLabel'        => esc_html__( 'Errors (%d)', $this->textdomain ),
-					'issuesDetected'     => esc_html__( 'Differences detected', $this->textdomain ),
-					'noDifferences'      => esc_html__( 'No differences detected.', $this->textdomain ),
-					'statusError'        => esc_html__( 'Verification failed.', $this->textdomain ),
-					'versionLabel'       => esc_html__( 'Version %s', $this->textdomain ),
+					'progressIdle'       => esc_html__( 'Waiting to start…', 'k-integrity-guard' ),
+					'progressPreparing'  => esc_html__( 'Preparing scan…', 'k-integrity-guard' ),
+					'progressFinalizing' => esc_html__( 'Wrapping up scan…', 'k-integrity-guard' ),
+					'progressCompleted'  => esc_html__( 'Scan completed.', 'k-integrity-guard' ),
+					'noIssues'           => esc_html__( 'No integrity issues detected.', 'k-integrity-guard' ),
+					'issuesFound'        => esc_html__( 'Integrity issues detected.', 'k-integrity-guard' ),
+					'errorMessage'       => esc_html__( 'Unable to continue the scan. Please try again.', 'k-integrity-guard' ),
+					'lookAtSummary'      => esc_html__( 'Review the scan summary below for details.', 'k-integrity-guard' ),
+					'viewLastSummary'    => esc_html__( 'Last scan summary:', 'k-integrity-guard' ),
+					/* translators: %s: Date and time of the last scan. */
+					'lastRunLabel'       => esc_html__( 'Completed on %s', 'k-integrity-guard' ),
+					'buttonStart'        => esc_html__( 'Start Scan', 'k-integrity-guard' ),
+					'buttonWorking'      => esc_html__( 'Starting…', 'k-integrity-guard' ),
+					/* translators: %d: Number of modified files. */
+					'modifiedTitle'      => esc_html__( 'Modified files (%d)', 'k-integrity-guard' ),
+					/* translators: %d: Number of missing files. */
+					'missingTitle'       => esc_html__( 'Missing files (%d)', 'k-integrity-guard' ),
+					/* translators: %d: Number of unexpected files. */
+					'addedTitle'         => esc_html__( 'Unexpected files (%d)', 'k-integrity-guard' ),
+					'coreHeading'        => esc_html__( 'WordPress Core', 'k-integrity-guard' ),
+					'pluginsHeading'     => esc_html__( 'Plugins', 'k-integrity-guard' ),
+					'themesHeading'      => esc_html__( 'Themes', 'k-integrity-guard' ),
+					/* translators: %d: Number of skipped items. */
+					'skippedLabel'       => esc_html__( 'Skipped (%d)', 'k-integrity-guard' ),
+					/* translators: %d: Number of errors. */
+					'errorsLabel'        => esc_html__( 'Errors (%d)', 'k-integrity-guard' ),
+					'issuesDetected'     => esc_html__( 'Differences detected', 'k-integrity-guard' ),
+					'noDifferences'      => esc_html__( 'No differences detected.', 'k-integrity-guard' ),
+					'statusError'        => esc_html__( 'Verification failed.', 'k-integrity-guard' ),
+					/* translators: %s: Version number. */
+					'versionLabel'       => esc_html__( 'Version %s', 'k-integrity-guard' ),
 				),
 			)
 		);
@@ -201,10 +202,10 @@ class KIG_Scan {
 	 */
 	public function get_targets(): array {
 		return array(
-			'core'                => esc_html__( 'WordPress Core', $this->textdomain ),
-			'plugins'             => esc_html__( 'Plugins', $this->textdomain ),
-			'themes'              => esc_html__( 'Themes', $this->textdomain ),
-			'third_party_plugins' => esc_html__( 'Third-Party Plugins', $this->textdomain ),
+			'core'                => esc_html__( 'WordPress Core', 'k-integrity-guard' ),
+			'plugins'             => esc_html__( 'Plugins', 'k-integrity-guard' ),
+			'themes'              => esc_html__( 'Themes', 'k-integrity-guard' ),
+			'third_party_plugins' => esc_html__( 'Third-Party Plugins', 'k-integrity-guard' ),
 		);
 	}
 
@@ -213,7 +214,7 @@ class KIG_Scan {
 	 */
 	public function handle_start_scan(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Access denied.', $this->textdomain ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Access denied.', 'k-integrity-guard' ) ), 403 );
 		}
 
 		check_ajax_referer( 'kig_start_scan', 'nonce' );
@@ -238,7 +239,7 @@ class KIG_Scan {
 	 */
 	public function handle_scan_status(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Access denied.', $this->textdomain ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Access denied.', 'k-integrity-guard' ) ), 403 );
 		}
 
 		check_ajax_referer( 'kig_scan_status', 'nonce' );
@@ -246,13 +247,13 @@ class KIG_Scan {
 		$job_id = isset( $_POST['job'] ) ? sanitize_text_field( wp_unslash( $_POST['job'] ) ) : '';
 
 		if ( '' === $job_id ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid job identifier.', $this->textdomain ) ), 400 );
+			wp_send_json_error( array( 'message' => __( 'Invalid job identifier.', 'k-integrity-guard' ) ), 400 );
 		}
 
 		$job = $this->load_job_state( $job_id );
 
 		if ( null === $job ) {
-			wp_send_json_error( array( 'message' => __( 'Scan session expired. Please start again.', $this->textdomain ) ), 410 );
+			wp_send_json_error( array( 'message' => __( 'Scan session expired. Please start again.', 'k-integrity-guard' ) ), 410 );
 		}
 
 		$result = $this->advance_job_state( $job );
@@ -269,7 +270,7 @@ class KIG_Scan {
 
 		$message = $result['message'];
 		if ( '' === $message ) {
-			$message = __( 'Processing…', $this->textdomain );
+			$message = __( 'Processing…', 'k-integrity-guard' );
 		}
 
 		$response = array(
@@ -552,7 +553,7 @@ class KIG_Scan {
 				default:
 					if ( 'pending' === ( $state['status'] ?? 'pending' ) ) {
 						$state['status']  = 'skipped';
-						$state['message'] = __( 'Scanning for this target is not yet available.', $this->textdomain );
+						$state['message'] = __( 'Scanning for this target is not yet available.', 'k-integrity-guard' );
 						$job['results'][ $target ] = array(
 							'status'  => 'skipped',
 							'message' => $state['message'],
@@ -598,7 +599,7 @@ class KIG_Scan {
 
 		if ( 'pending' === $status ) {
 			$state['status']  = 'preparing';
-			$state['message'] = __( 'Fetching WordPress core checksums…', $this->textdomain );
+			$state['message'] = __( 'Fetching WordPress core checksums…', 'k-integrity-guard' );
 
 			$result = $this->prepare_core_target( $state );
 
@@ -615,7 +616,7 @@ class KIG_Scan {
 			}
 
 			$state['status']  = 'processing';
-			$state['message'] = __( 'Scanning WordPress core files…', $this->textdomain );
+			$state['message'] = __( 'Scanning WordPress core files…', 'k-integrity-guard' );
 
 			return array(
 				'complete' => false,
@@ -640,7 +641,7 @@ class KIG_Scan {
 
 			if ( ! empty( $chunk['finished'] ) ) {
 				$state['status']  = 'finalizing';
-				$state['message'] = __( 'Wrapping up WordPress core scan…', $this->textdomain );
+				$state['message'] = __( 'Wrapping up WordPress core scan…', 'k-integrity-guard' );
 
 				return array(
 					'complete' => false,
@@ -648,7 +649,7 @@ class KIG_Scan {
 				);
 			}
 
-			$state['message'] = $chunk['message'] ?? __( 'Scanning WordPress core files…', $this->textdomain );
+			$state['message'] = $chunk['message'] ?? __( 'Scanning WordPress core files…', 'k-integrity-guard' );
 
 			return array(
 				'complete' => false,
@@ -670,7 +671,7 @@ class KIG_Scan {
 		if ( 'completed' === $status ) {
 			return array(
 				'complete' => true,
-				'message'  => $state['message'] ?? __( 'WordPress core scan completed.', $this->textdomain ),
+				'message'  => $state['message'] ?? __( 'WordPress core scan completed.', 'k-integrity-guard' ),
 			);
 		}
 
@@ -678,7 +679,7 @@ class KIG_Scan {
 			return array(
 				'complete' => true,
 				'error'    => true,
-				'message'  => $state['error_message'] ?? __( 'Unable to scan WordPress core.', $this->textdomain ),
+				'message'  => $state['error_message'] ?? __( 'Unable to scan WordPress core.', 'k-integrity-guard' ),
 			);
 		}
 
@@ -769,7 +770,7 @@ class KIG_Scan {
 					'kig_http_error',
 					sprintf(
 						/* translators: %s: HTTP status code. */
-						__( 'Unexpected response while fetching core checksums (%s).', $this->textdomain ),
+						__( 'Unexpected response while fetching core checksums (%s).', 'k-integrity-guard' ),
 						$code
 					)
 				);
@@ -780,7 +781,7 @@ class KIG_Scan {
 			$data = json_decode( $body, true );
 
 			if ( ! is_array( $data ) ) {
-				$last_error = new WP_Error( 'kig_invalid_response', __( 'Unable to parse checksum response.', $this->textdomain ) );
+				$last_error = new WP_Error( 'kig_invalid_response', __( 'Unable to parse checksum response.', 'k-integrity-guard' ) );
 				continue;
 			}
 
@@ -790,7 +791,7 @@ class KIG_Scan {
 					continue;
 				}
 
-				$last_error = new WP_Error( 'kig_missing_checksums', __( 'Checksum data was not provided by WordPress.org.', $this->textdomain ) );
+				$last_error = new WP_Error( 'kig_missing_checksums', __( 'Checksum data was not provided by WordPress.org.', 'k-integrity-guard' ) );
 				continue;
 			}
 
@@ -800,7 +801,7 @@ class KIG_Scan {
 			);
 		}
 
-		return $last_error ? $last_error : new WP_Error( 'kig_checksum_unavailable', __( 'Unable to download WordPress core checksums.', $this->textdomain ) );
+		return $last_error ? $last_error : new WP_Error( 'kig_checksum_unavailable', __( 'Unable to download WordPress core checksums.', 'k-integrity-guard' ) );
 	}
 
 	/**
@@ -932,7 +933,7 @@ class KIG_Scan {
 		if ( empty( $files ) || 0 === $total ) {
 			return array(
 				'finished' => true,
-				'message'  => __( 'No core files were available for scanning.', $this->textdomain ),
+				'message'  => __( 'No core files were available for scanning.', 'k-integrity-guard' ),
 			);
 		}
 
@@ -950,7 +951,7 @@ class KIG_Scan {
 			} elseif ( ! is_readable( $full ) ) {
 				$state['errors'][]  = array(
 					'file'    => $file,
-					'message' => __( 'File could not be read.', $this->textdomain ),
+					'message' => __( 'File could not be read.', 'k-integrity-guard' ),
 				);
 				$state['modified'][] = array(
 					'file'     => $file,
@@ -980,7 +981,7 @@ class KIG_Scan {
 
 		$message = sprintf(
 			/* translators: 1: processed count, 2: total count. */
-			__( 'Scanning WordPress core files (%1$d of %2$d)…', $this->textdomain ),
+			__( 'Scanning WordPress core files (%1$d of %2$d)…', 'k-integrity-guard' ),
 			(int) $state['processed'],
 			$total
 		);
@@ -1039,16 +1040,16 @@ class KIG_Scan {
 
 		if ( 0 === $modified && 0 === $missing && 0 === $added ) {
 			if ( $includes_themes ) {
-				return __( 'WordPress core and bundled themes scan completed without integrity issues.', $this->textdomain );
+				return __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
 			}
 
-			return __( 'WordPress core scan completed without integrity issues.', $this->textdomain );
+			return __( 'WordPress core scan completed without integrity issues.', 'k-integrity-guard' );
 		}
 
 		if ( $includes_themes ) {
 			return sprintf(
 				/* translators: 1: modified count, 2: missing count, 3: added count. */
-				__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', $this->textdomain ),
+				__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
 				$modified,
 				$missing,
 				$added
@@ -1057,7 +1058,7 @@ class KIG_Scan {
 
 		return sprintf(
 			/* translators: 1: modified count, 2: missing count, 3: added count. */
-			__( 'WordPress core issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', $this->textdomain ),
+			__( 'WordPress core issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
 			$modified,
 			$missing,
 			$added
@@ -1109,7 +1110,7 @@ class KIG_Scan {
 
 			if ( empty( $state['total'] ) ) {
 				$state['status']  = 'completed';
-				$state['message'] = __( 'No WordPress.org plugins were available for verification.', $this->textdomain );
+				$state['message'] = __( 'No WordPress.org plugins were available for verification.', 'k-integrity-guard' );
 
 				return array(
 					'complete' => true,
@@ -1119,7 +1120,7 @@ class KIG_Scan {
 			}
 
 			$state['status']  = 'processing';
-			$state['message'] = __( 'Preparing plugin verification…', $this->textdomain );
+			$state['message'] = __( 'Preparing plugin verification…', 'k-integrity-guard' );
 
 			return array(
 				'complete' => false,
@@ -1134,7 +1135,7 @@ class KIG_Scan {
 			if ( ! empty( $result['finished'] ) ) {
 				$this->finalize_plugins_target( $state );
 				$state['status']  = 'completed';
-				$state['message'] = __( 'Plugin verification completed.', $this->textdomain );
+				$state['message'] = __( 'Plugin verification completed.', 'k-integrity-guard' );
 
 				return array(
 					'complete' => true,
@@ -1165,7 +1166,7 @@ class KIG_Scan {
 	 */
 	private function prepare_plugins_target( array &$state ) {
 		if ( ! class_exists( 'KIG_Utils' ) ) {
-			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', 'k-integrity-guard' ) );
 		}
 
 		$sources = KIG_Utils::detect_plugin_sources();
@@ -1184,7 +1185,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'plugin' => $file,
 					'name'   => $name,
-					'reason' => __( 'Not available on WordPress.org.', $this->textdomain ),
+					'reason' => __( 'Not available on WordPress.org.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1193,7 +1194,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'plugin' => $file,
 					'name'   => $name,
-					'reason' => __( 'Plugin slug could not be determined.', $this->textdomain ),
+					'reason' => __( 'Plugin slug could not be determined.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1202,7 +1203,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'plugin' => $file,
 					'name'   => $name,
-					'reason' => __( 'Plugin version could not be determined.', $this->textdomain ),
+					'reason' => __( 'Plugin version could not be determined.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1269,7 +1270,7 @@ class KIG_Scan {
 
 				$message = sprintf(
 					/* translators: %s: Plugin name. */
-					__( 'Verification failed for plugin %s.', $this->textdomain ),
+					__( 'Verification failed for plugin %s.', 'k-integrity-guard' ),
 					$plugin['name'] ?? $key
 				);
 
@@ -1295,7 +1296,7 @@ class KIG_Scan {
 
 			$message = sprintf(
 				/* translators: 1: plugin name, 2: current position, 3: total. */
-				__( 'Checked plugin %1$s (%2$d of %3$d).', $this->textdomain ),
+				__( 'Checked plugin %1$s (%2$d of %3$d).', 'k-integrity-guard' ),
 				$plugin['name'] ?? $key,
 				$index + 1,
 				$total
@@ -1317,7 +1318,7 @@ class KIG_Scan {
 		return array(
 			'finished' => true,
 			'error'    => false,
-			'message'  => __( 'Plugin verification completed.', $this->textdomain ),
+			'message'  => __( 'Plugin verification completed.', 'k-integrity-guard' ),
 		);
 	}
 
@@ -1334,7 +1335,7 @@ class KIG_Scan {
 		$name        = $plugin['name'] ?? $plugin_file;
 
 		if ( '' === $plugin_file || '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', 'k-integrity-guard' ) );
 		}
 
 		$checksums = $this->fetch_plugin_checksums( $slug, $version );
@@ -1353,7 +1354,7 @@ class KIG_Scan {
 
 		$map = $this->normalize_checksum_map( $checksums['checksums'], $prefixes );
 		if ( empty( $map ) ) {
-			return new WP_Error( 'kig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', 'k-integrity-guard' ) );
 		}
 
 		$root_info    = $this->determine_plugin_root( $plugin_file, $slug );
@@ -1361,8 +1362,8 @@ class KIG_Scan {
 		$has_issues   = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
 		$status       = $has_issues ? 'issues' : 'ok';
 		$message      = $has_issues
-			? sprintf( __( 'Differences detected in plugin %s.', $this->textdomain ), $name )
-			: sprintf( __( 'Plugin %s matches the official checksums.', $this->textdomain ), $name );
+			? sprintf( __( 'Differences detected in plugin %s.', 'k-integrity-guard' ), $name )
+			: sprintf( __( 'Plugin %s matches the official checksums.', 'k-integrity-guard' ), $name );
 
 		return array(
 			'status'   => $status,
@@ -1474,27 +1475,27 @@ class KIG_Scan {
 
 		if ( 0 === $total ) {
 			if ( $skipped > 0 ) {
-				return __( 'No WordPress.org plugins were available for verification.', $this->textdomain );
+				return __( 'No WordPress.org plugins were available for verification.', 'k-integrity-guard' );
 			}
 
-			return __( 'No plugins required verification.', $this->textdomain );
+			return __( 'No plugins required verification.', 'k-integrity-guard' );
 		}
 
 		if ( 0 === $issues && 0 === $error_count ) {
 			if ( $skipped > 0 ) {
 				return sprintf(
 					/* translators: %d: number of plugins. */
-					__( 'All WordPress.org plugins verified successfully. %d plugin(s) were skipped.', $this->textdomain ),
+					__( 'All WordPress.org plugins verified successfully. %d plugin(s) were skipped.', 'k-integrity-guard' ),
 					$skipped
 				);
 			}
 
-			return __( 'All WordPress.org plugins match the official checksums.', $this->textdomain );
+			return __( 'All WordPress.org plugins match the official checksums.', 'k-integrity-guard' );
 		}
 
 		$message = sprintf(
 			/* translators: 1: number of plugins with issues, 2: total verified. */
-			__( 'Integrity issues detected in %1$d plugin(s) out of %2$d verified.', $this->textdomain ),
+			__( 'Integrity issues detected in %1$d plugin(s) out of %2$d verified.', 'k-integrity-guard' ),
 			$issues,
 			$total
 		);
@@ -1502,7 +1503,7 @@ class KIG_Scan {
 		if ( $error_count > 0 ) {
 			$message .= ' ' . sprintf(
 				/* translators: %d: number of plugins. */
-				__( '%d plugin(s) could not be verified.', $this->textdomain ),
+				__( '%d plugin(s) could not be verified.', 'k-integrity-guard' ),
 				$error_count
 			);
 		}
@@ -1510,7 +1511,7 @@ class KIG_Scan {
 		if ( $skipped > 0 ) {
 			$message .= ' ' . sprintf(
 				/* translators: %d: number of plugins. */
-				__( '%d plugin(s) were skipped.', $this->textdomain ),
+				__( '%d plugin(s) were skipped.', 'k-integrity-guard' ),
 				$skipped
 			);
 		}
@@ -1543,7 +1544,7 @@ class KIG_Scan {
 
 			if ( empty( $state['total'] ) ) {
 				$state['status']  = 'completed';
-				$state['message'] = __( 'No WordPress.org themes were available for verification.', $this->textdomain );
+				$state['message'] = __( 'No WordPress.org themes were available for verification.', 'k-integrity-guard' );
 
 				return array(
 					'complete' => true,
@@ -1553,7 +1554,7 @@ class KIG_Scan {
 			}
 
 			$state['status']  = 'processing';
-			$state['message'] = __( 'Preparing theme verification…', $this->textdomain );
+			$state['message'] = __( 'Preparing theme verification…', 'k-integrity-guard' );
 
 			return array(
 				'complete' => false,
@@ -1568,7 +1569,7 @@ class KIG_Scan {
 			if ( ! empty( $result['finished'] ) ) {
 				$this->finalize_themes_target( $state );
 				$state['status']  = 'completed';
-				$state['message'] = __( 'Theme verification completed.', $this->textdomain );
+				$state['message'] = __( 'Theme verification completed.', 'k-integrity-guard' );
 
 				return array(
 					'complete' => true,
@@ -1599,7 +1600,7 @@ class KIG_Scan {
 	 */
 	private function prepare_themes_target( array &$state ) {
 		if ( ! class_exists( 'KIG_Utils' ) ) {
-			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', 'k-integrity-guard' ) );
 		}
 
 		$sources = KIG_Utils::detect_theme_sources();
@@ -1623,7 +1624,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'theme'  => $stylesheet,
 					'name'   => $name,
-					'reason' => __( 'Child theme - inherits from parent.', $this->textdomain ),
+					'reason' => __( 'Child theme - inherits from parent.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1633,7 +1634,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'theme'  => $stylesheet,
 					'name'   => $name,
-					'reason' => __( 'Default WordPress theme - verified with core scan.', $this->textdomain ),
+					'reason' => __( 'Default WordPress theme - verified with core scan.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1643,7 +1644,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'theme'  => $stylesheet,
 					'name'   => $name,
-					'reason' => __( 'Not available on WordPress.org.', $this->textdomain ),
+					'reason' => __( 'Not available on WordPress.org.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1652,7 +1653,7 @@ class KIG_Scan {
 				$skipped[] = array(
 					'theme'  => $stylesheet,
 					'name'   => $name,
-					'reason' => __( 'Theme version could not be determined.', $this->textdomain ),
+					'reason' => __( 'Theme version could not be determined.', 'k-integrity-guard' ),
 				);
 				continue;
 			}
@@ -1719,7 +1720,7 @@ class KIG_Scan {
 
 				$message = sprintf(
 					/* translators: %s: Theme name. */
-					__( 'Verification failed for theme %s.', $this->textdomain ),
+					__( 'Verification failed for theme %s.', 'k-integrity-guard' ),
 					$theme['name'] ?? $key
 				);
 
@@ -1745,7 +1746,7 @@ class KIG_Scan {
 
 			$message = sprintf(
 				/* translators: 1: theme name, 2: current position, 3: total. */
-				__( 'Checked theme %1$s (%2$d of %3$d).', $this->textdomain ),
+				__( 'Checked theme %1$s (%2$d of %3$d).', 'k-integrity-guard' ),
 				$theme['name'] ?? $key,
 				$index + 1,
 				$total
@@ -1767,7 +1768,7 @@ class KIG_Scan {
 		return array(
 			'finished' => true,
 			'error'    => false,
-			'message'  => __( 'Theme verification completed.', $this->textdomain ),
+			'message'  => __( 'Theme verification completed.', 'k-integrity-guard' ),
 		);
 	}
 
@@ -1784,17 +1785,17 @@ class KIG_Scan {
 		$name       = $theme['name'] ?? $stylesheet;
 
 		if ( '' === $stylesheet || '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_theme_data', __( 'Insufficient data to verify theme.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_data', __( 'Insufficient data to verify theme.', 'k-integrity-guard' ) );
 		}
 
 		$theme_obj = wp_get_theme( $stylesheet );
 		if ( ! $theme_obj->exists() ) {
-			return new WP_Error( 'kig_theme_missing', __( 'Theme is not installed.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_missing', __( 'Theme is not installed.', 'k-integrity-guard' ) );
 		}
 
 		$root = $theme_obj->get_stylesheet_directory();
 		if ( ! $root || ! is_dir( $root ) ) {
-			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', 'k-integrity-guard' ) );
 		}
 
 		$checksums = $this->fetch_theme_checksums( $slug, $version );
@@ -1804,15 +1805,15 @@ class KIG_Scan {
 
 		$map = $this->normalize_checksum_map( $checksums['checksums'], array( $slug ) );
 		if ( empty( $map ) ) {
-			return new WP_Error( 'kig_missing_theme_checksums', __( 'Theme checksums were not provided.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_theme_checksums', __( 'Theme checksums were not provided.', 'k-integrity-guard' ) );
 		}
 
 		$comparison = $this->compare_extension_files( $root, $map, $checksums['checksum_type'], true );
 		$has_issues = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
 		$status     = $has_issues ? 'issues' : 'ok';
 		$message    = $has_issues
-			? sprintf( __( 'Differences detected in theme %s.', $this->textdomain ), $name )
-			: sprintf( __( 'Theme %s matches the official checksums.', $this->textdomain ), $name );
+			? sprintf( __( 'Differences detected in theme %s.', 'k-integrity-guard' ), $name )
+			: sprintf( __( 'Theme %s matches the official checksums.', 'k-integrity-guard' ), $name );
 
 		return array(
 			'status'   => $status,
@@ -1924,27 +1925,27 @@ class KIG_Scan {
 
 		if ( 0 === $total ) {
 			if ( $skipped > 0 ) {
-				return __( 'No WordPress.org themes were available for verification.', $this->textdomain );
+				return __( 'No WordPress.org themes were available for verification.', 'k-integrity-guard' );
 			}
 
-			return __( 'No themes required verification.', $this->textdomain );
+			return __( 'No themes required verification.', 'k-integrity-guard' );
 		}
 
 		if ( 0 === $issues && 0 === $error_count ) {
 			if ( $skipped > 0 ) {
 				return sprintf(
 					/* translators: %d: number of themes. */
-					__( 'All WordPress.org themes verified successfully. %d theme(s) were skipped.', $this->textdomain ),
+					__( 'All WordPress.org themes verified successfully. %d theme(s) were skipped.', 'k-integrity-guard' ),
 					$skipped
 				);
 			}
 
-			return __( 'All WordPress.org themes match the official checksums.', $this->textdomain );
+			return __( 'All WordPress.org themes match the official checksums.', 'k-integrity-guard' );
 		}
 
 		$message = sprintf(
 			/* translators: 1: number of themes with issues, 2: total verified. */
-			__( 'Integrity issues detected in %1$d theme(s) out of %2$d verified.', $this->textdomain ),
+			__( 'Integrity issues detected in %1$d theme(s) out of %2$d verified.', 'k-integrity-guard' ),
 			$issues,
 			$total
 		);
@@ -1952,7 +1953,7 @@ class KIG_Scan {
 		if ( $error_count > 0 ) {
 			$message .= ' ' . sprintf(
 				/* translators: %d: number of themes. */
-				__( '%d theme(s) could not be verified.', $this->textdomain ),
+				__( '%d theme(s) could not be verified.', 'k-integrity-guard' ),
 				$error_count
 			);
 		}
@@ -1960,7 +1961,7 @@ class KIG_Scan {
 		if ( $skipped > 0 ) {
 			$message .= ' ' . sprintf(
 				/* translators: %d: number of themes. */
-				__( '%d theme(s) were skipped.', $this->textdomain ),
+				__( '%d theme(s) were skipped.', 'k-integrity-guard' ),
 				$skipped
 			);
 		}
@@ -1977,7 +1978,7 @@ class KIG_Scan {
 	 */
 	private function fetch_plugin_checksums( string $slug, string $version ) {
 		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_plugin_checksum_args', __( 'Invalid plugin checksum request.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_args', __( 'Invalid plugin checksum request.', 'k-integrity-guard' ) );
 		}
 
 		return $this->fetch_plugin_checksums_from_downloads( $slug, $version );
@@ -1996,7 +1997,7 @@ class KIG_Scan {
 			$url,
 			array(
 				'timeout'    => 20,
-				'user-agent' => 'K'Integrity Guard/' . $this->version,
+				'user-agent' => 'K\'Integrity Guard/' . $this->version,
 			)
 		);
 
@@ -2007,21 +2008,21 @@ class KIG_Scan {
 		$code = (int) wp_remote_retrieve_response_code( $request );
 		if ( 200 !== $code ) {
 			if ( 404 === $code ) {
-				return new WP_Error( 'kig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
+				return new WP_Error( 'kig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', 'k-integrity-guard' ) );
 			}
 
-			return new WP_Error( 'kig_plugin_checksum_http', __( 'Unable to download plugin checksums.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_http', __( 'Unable to download plugin checksums.', 'k-integrity-guard' ) );
 		}
 
 		$body = wp_remote_retrieve_body( $request );
 		$data = json_decode( $body, true );
 
 		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'kig_plugin_checksum_json', __( 'Unexpected plugin checksum response.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_json', __( 'Unexpected plugin checksum response.', 'k-integrity-guard' ) );
 		}
 
 		if ( empty( $data['files'] ) || ! is_array( $data['files'] ) ) {
-			return new WP_Error( 'kig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', $this->textdomain ) );
+			return new WP_Error( 'kig_plugin_checksum_missing', __( 'Plugin checksums were not provided by WordPress.org.', 'k-integrity-guard' ) );
 		}
 
 		return array(
@@ -2039,7 +2040,7 @@ class KIG_Scan {
 	 */
 	private function fetch_theme_checksums( string $slug, string $version ) {
 		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_theme_checksum_args', __( 'Invalid theme checksum request.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_args', __( 'Invalid theme checksum request.', 'k-integrity-guard' ) );
 		}
 
 		$url = sprintf( 'https://api.wordpress.org/themes/checksums/1.0/%1$s/%2$s', rawurlencode( $slug ), rawurlencode( $version ) );
@@ -2054,7 +2055,7 @@ class KIG_Scan {
 			$url,
 			array(
 				'timeout'   => 20,
-				'user-agent' => 'K'Integrity Guard/' . $this->version,
+				'user-agent' => 'K\'Integrity Guard/' . $this->version,
 			)
 		);
 
@@ -2064,14 +2065,14 @@ class KIG_Scan {
 
 		$code = (int) wp_remote_retrieve_response_code( $request );
 		if ( 200 !== $code ) {
-			return new WP_Error( 'kig_theme_checksum_http', __( 'Unable to download theme checksums.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_http', __( 'Unable to download theme checksums.', 'k-integrity-guard' ) );
 		}
 
 		$body = wp_remote_retrieve_body( $request );
 		$data = json_decode( $body, true );
 
 		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'kig_theme_checksum_json', __( 'Unexpected theme checksum response.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_json', __( 'Unexpected theme checksum response.', 'k-integrity-guard' ) );
 		}
 
 		if ( empty( $data['checksums'] ) || ! is_array( $data['checksums'] ) ) {
@@ -2079,7 +2080,7 @@ class KIG_Scan {
 				return new WP_Error( 'kig_theme_checksum_error', $data['error'] );
 			}
 
-			return new WP_Error( 'kig_theme_checksum_missing', __( 'Theme checksums were not provided by WordPress.org.', $this->textdomain ) );
+			return new WP_Error( 'kig_theme_checksum_missing', __( 'Theme checksums were not provided by WordPress.org.', 'k-integrity-guard' ) );
 		}
 
 		$type = isset( $data['checksum_type'] ) ? strtolower( (string) $data['checksum_type'] ) : 'md5';
@@ -2159,7 +2160,7 @@ class KIG_Scan {
 			if ( ! is_readable( $full ) ) {
 				$errors[] = array(
 					'file'    => $relative,
-					'message' => __( 'File could not be read.', $this->textdomain ),
+					'message' => __( 'File could not be read.', 'k-integrity-guard' ),
 				);
 				$modified[] = array(
 					'file'     => $relative,
@@ -2173,7 +2174,7 @@ class KIG_Scan {
 			if ( ! $actual ) {
 				$errors[] = array(
 					'file'    => $relative,
-					'message' => __( 'File could not be hashed.', $this->textdomain ),
+					'message' => __( 'File could not be hashed.', 'k-integrity-guard' ),
 				);
 				$modified[] = array(
 					'file'     => $relative,
@@ -2298,7 +2299,7 @@ class KIG_Scan {
 		$clean = trim( wp_strip_all_tags( $label ) );
 
 		if ( '' === $clean ) {
-			return __( 'Unknown', $this->textdomain );
+			return __( 'Unknown', 'k-integrity-guard' );
 		}
 
 		return $clean;
@@ -2454,7 +2455,7 @@ class KIG_Scan {
 		}
 
 		if ( empty( $parts ) ) {
-			return __( 'Scan completed.', $this->textdomain );
+			return __( 'Scan completed.', 'k-integrity-guard' );
 		}
 
 		return implode( ' ', $parts );
@@ -2571,7 +2572,7 @@ class KIG_Scan {
 
 		return false;
 	}
-}
+
 
 
 	/**
@@ -2599,7 +2600,7 @@ class KIG_Scan {
 
 			if ( empty( $state['total'] ) ) {
 				$state['status']  = 'completed';
-				$state['message'] = __( 'No third-party plugins with snapshots were available for verification.', $this->textdomain );
+				$state['message'] = __( 'No third-party plugins with snapshots were available for verification.', 'k-integrity-guard' );
 
 				return array(
 'complete' => true,
@@ -2609,7 +2610,7 @@ class KIG_Scan {
 			}
 
 			$state['status']  = 'processing';
-			$state['message'] = __( 'Preparing third-party plugin verification…', $this->textdomain );
+			$state['message'] = __( 'Preparing third-party plugin verification…', 'k-integrity-guard' );
 
 			return array(
 'complete' => false,
@@ -2624,7 +2625,7 @@ class KIG_Scan {
 			if ( ! empty( $result['finished'] ) ) {
 				$this->finalize_third_party_plugins_target( $state );
 				$state['status']  = 'completed';
-				$state['message'] = __( 'Third-party plugin verification completed.', $this->textdomain );
+				$state['message'] = __( 'Third-party plugin verification completed.', 'k-integrity-guard' );
 
 				return array(
 'complete' => true,
@@ -2655,7 +2656,7 @@ class KIG_Scan {
 	 */
 	private function prepare_third_party_plugins_target( array &$state ) {
 		if ( ! class_exists( 'KIG_Utils' ) ) {
-			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', $this->textdomain ) );
+			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', 'k-integrity-guard' ) );
 		}
 
 		$sources  = KIG_Utils::detect_plugin_sources();
@@ -2678,7 +2679,7 @@ if ( ! empty( $ignores[ $plugin_file ] ) ) {
 $skipped[] = array(
 'plugin' => $plugin_file,
 'name'   => $name,
-'reason' => __( 'Ignored by user.', $this->textdomain ),
+'reason' => __( 'Ignored by user.', 'k-integrity-guard' ),
 );
 continue;
 }
@@ -2688,7 +2689,7 @@ if ( KIG_Utils::checksum_is_stale( $plugin_file ) ) {
 $skipped[] = array(
 'plugin' => $plugin_file,
 'name'   => $name,
-'reason' => __( 'No snapshot available. Generate one in Settings.', $this->textdomain ),
+'reason' => __( 'No snapshot available. Generate one in Settings.', 'k-integrity-guard' ),
 );
 continue;
 }
@@ -2733,7 +2734,7 @@ if ( $index >= $total ) {
 return array(
 'finished' => true,
 'error'    => false,
-'message'  => __( 'Third-party plugin verification completed.', $this->textdomain ),
+'message'  => __( 'Third-party plugin verification completed.', 'k-integrity-guard' ),
 );
 }
 
@@ -2755,7 +2756,7 @@ $state['errors'][] = array(
 
 $message = sprintf(
 /* translators: %s: Plugin name. */
-__( 'Verification failed for plugin %s.', $this->textdomain ),
+__( 'Verification failed for plugin %s.', 'k-integrity-guard' ),
 $plugin['name'] ?? $key
 );
 
@@ -2781,7 +2782,7 @@ $state['issue_total'] = (int) ( $state['issue_total'] ?? 0 ) + 1;
 
 $message = sprintf(
 /* translators: 1: plugin name, 2: current position, 3: total. */
-__( 'Checked plugin %1$s (%2$d of %3$d).', $this->textdomain ),
+__( 'Checked plugin %1$s (%2$d of %3$d).', 'k-integrity-guard' ),
 $plugin['name'] ?? $key,
 $index + 1,
 $total
@@ -2811,13 +2812,13 @@ $plugin_file = $plugin['plugin_file'] ?? '';
 $name        = $plugin['name'] ?? $plugin_file;
 
 if ( '' === $plugin_file ) {
-return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', $this->textdomain ) );
+return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', 'k-integrity-guard' ) );
 }
 
 // Load checksum snapshot.
 $checksums_data = KIG_Utils::read_plugin_checksum_json( $plugin_file );
 if ( ! $checksums_data || empty( $checksums_data['files'] ) ) {
-return new WP_Error( 'kig_no_checksum', __( 'No checksum snapshot available.', $this->textdomain ) );
+return new WP_Error( 'kig_no_checksum', __( 'No checksum snapshot available.', 'k-integrity-guard' ) );
 }
 
 // Determine plugin root directory.
@@ -2829,7 +2830,7 @@ $root = trailingslashit( WP_PLUGIN_DIR ) . $base;
 }
 
 if ( ! is_dir( $root ) ) {
-return new WP_Error( 'kig_plugin_path', __( 'Plugin directory could not be located.', $this->textdomain ) );
+return new WP_Error( 'kig_plugin_path', __( 'Plugin directory could not be located.', 'k-integrity-guard' ) );
 }
 
 // Compare files against snapshot.
@@ -2839,8 +2840,8 @@ $comparison = $this->compare_extension_files( $root, $checksums_data['files'], $
 $has_issues = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
 $status     = $has_issues ? 'issues' : 'ok';
 $message    = $has_issues
-? sprintf( __( 'Changes detected in plugin %s.', $this->textdomain ), $name )
-: sprintf( __( 'Plugin %s matches snapshot.', $this->textdomain ), $name );
+? sprintf( __( 'Changes detected in plugin %s.', 'k-integrity-guard' ), $name )
+: sprintf( __( 'Plugin %s matches snapshot.', 'k-integrity-guard' ), $name );
 
 return array(
 'status'   => $status,
@@ -2952,27 +2953,27 @@ $error_count = is_array( $state['errors'] ?? null ) ? count( $state['errors'] ) 
 
 if ( 0 === $total ) {
 if ( $skipped > 0 ) {
-return __( 'No third-party plugins with snapshots were available for verification.', $this->textdomain );
+return __( 'No third-party plugins with snapshots were available for verification.', 'k-integrity-guard' );
 }
 
-return __( 'No third-party plugins required verification.', $this->textdomain );
+return __( 'No third-party plugins required verification.', 'k-integrity-guard' );
 }
 
 if ( 0 === $issues && 0 === $error_count ) {
 if ( $skipped > 0 ) {
 return sprintf(
 /* translators: %d: number of plugins. */
-__( 'All third-party plugins verified successfully. %d plugin(s) were skipped.', $this->textdomain ),
+__( 'All third-party plugins verified successfully. %d plugin(s) were skipped.', 'k-integrity-guard' ),
 $skipped
 );
 }
 
-return __( 'All third-party plugins match their snapshots.', $this->textdomain );
+return __( 'All third-party plugins match their snapshots.', 'k-integrity-guard' );
 }
 
 $message = sprintf(
 /* translators: 1: number of plugins with issues, 2: total verified. */
-__( 'Changes detected in %1$d third-party plugin(s) out of %2$d verified.', $this->textdomain ),
+__( 'Changes detected in %1$d third-party plugin(s) out of %2$d verified.', 'k-integrity-guard' ),
 $issues,
 $total
 );
@@ -2980,7 +2981,7 @@ $total
 if ( $error_count > 0 ) {
 $message .= ' ' . sprintf(
 /* translators: %d: number of plugins. */
-__( '%d plugin(s) could not be verified.', $this->textdomain ),
+__( '%d plugin(s) could not be verified.', 'k-integrity-guard' ),
 $error_count
 );
 }
@@ -2988,7 +2989,7 @@ $error_count
 if ( $skipped > 0 ) {
 $message .= ' ' . sprintf(
 /* translators: %d: number of plugins. */
-__( '%d plugin(s) were skipped.', $this->textdomain ),
+__( '%d plugin(s) were skipped.', 'k-integrity-guard' ),
 $skipped
 );
 }

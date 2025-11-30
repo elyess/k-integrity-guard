@@ -18,12 +18,7 @@ if ( ! class_exists( 'WP_List_Table' ) ) {
  */
 class KIG_History_Table extends WP_List_Table {
 
-	/**
-	 * Text domain for translations.
-	 *
-	 * @var string
-	 */
-	private $textdomain = 'k-integrity-guard';
+
 
 	/**
 	 * Constructor.
@@ -46,11 +41,11 @@ class KIG_History_Table extends WP_List_Table {
 	public function get_columns() {
 		return array(
 			'cb'           => '<input type="checkbox" />',
-			'scan_date'    => esc_html__( 'Scan Date', $this->textdomain ),
-			'context'      => esc_html__( 'Context', $this->textdomain ),
-			'targets'      => esc_html__( 'Targets', $this->textdomain ),
-			'total_issues' => esc_html__( 'Issues Found', $this->textdomain ),
-			'status'       => esc_html__( 'Status', $this->textdomain ),
+			'scan_date'    => esc_html__( 'Scan Date', 'k-integrity-guard' ),
+			'context'      => esc_html__( 'Context', 'k-integrity-guard' ),
+			'targets'      => esc_html__( 'Targets', 'k-integrity-guard' ),
+			'total_issues' => esc_html__( 'Issues Found', 'k-integrity-guard' ),
+			'status'       => esc_html__( 'Status', 'k-integrity-guard' ),
 		);
 	}
 
@@ -75,7 +70,7 @@ class KIG_History_Table extends WP_List_Table {
 	 */
 	protected function get_bulk_actions() {
 		return array(
-			'delete' => esc_html__( 'Delete', $this->textdomain ),
+			'delete' => esc_html__( 'Delete', 'k-integrity-guard' ),
 		);
 	}
 
@@ -101,7 +96,7 @@ class KIG_History_Table extends WP_List_Table {
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( remove_query_arg( 'scan_status' ) ),
 				'all' === $current ? 'current' : '',
-				esc_html__( 'All', $this->textdomain ),
+				esc_html__( 'All', 'k-integrity-guard' ),
 				(int) $all_count
 			),
 		);
@@ -111,7 +106,7 @@ class KIG_History_Table extends WP_List_Table {
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( add_query_arg( 'scan_status', 'success' ) ),
 				'success' === $current ? 'current' : '',
-				esc_html__( 'Success', $this->textdomain ),
+				esc_html__( 'Success', 'k-integrity-guard' ),
 				(int) $success_count
 			);
 		}
@@ -121,7 +116,7 @@ class KIG_History_Table extends WP_List_Table {
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( add_query_arg( 'scan_status', 'warning' ) ),
 				'warning' === $current ? 'current' : '',
-				esc_html__( 'Warnings', $this->textdomain ),
+				esc_html__( 'Warnings', 'k-integrity-guard' ),
 				(int) $warning_count
 			);
 		}
@@ -131,7 +126,7 @@ class KIG_History_Table extends WP_List_Table {
 				'<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
 				esc_url( add_query_arg( 'scan_status', 'error' ) ),
 				'error' === $current ? 'current' : '',
-				esc_html__( 'Errors', $this->textdomain ),
+				esc_html__( 'Errors', 'k-integrity-guard' ),
 				(int) $error_count
 			);
 		}
@@ -212,13 +207,13 @@ class KIG_History_Table extends WP_List_Table {
 			'view'   => sprintf(
 				'<a href="%s">%s</a>',
 				esc_url( $view_url ),
-				esc_html__( 'View Details', $this->textdomain )
+				esc_html__( 'View Details', 'k-integrity-guard' )
 			),
 			'delete' => sprintf(
 				'<a href="%s" onclick="return confirm(\'%s\');">%s</a>',
 				esc_url( $delete_url ),
-				esc_js( __( 'Are you sure you want to delete this scan?', $this->textdomain ) ),
-				esc_html__( 'Delete', $this->textdomain )
+				esc_js( __( 'Are you sure you want to delete this scan?', 'k-integrity-guard' ) ),
+				esc_html__( 'Delete', 'k-integrity-guard' )
 			),
 		);
 
@@ -235,10 +230,10 @@ class KIG_History_Table extends WP_List_Table {
 		$context = sanitize_key( $item['context'] );
 
 		if ( 'cron' === $context ) {
-			return '<span class="wpig-context-badge wpig-context-cron">' . esc_html__( 'Scheduled', $this->textdomain ) . '</span>';
+			return '<span class="wpig-context-badge wpig-context-cron">' . esc_html__( 'Scheduled', 'k-integrity-guard' ) . '</span>';
 		}
 
-		return '<span class="wpig-context-badge wpig-context-manual">' . esc_html__( 'Manual', $this->textdomain ) . '</span>';
+		return '<span class="wpig-context-badge wpig-context-manual">' . esc_html__( 'Manual', 'k-integrity-guard' ) . '</span>';
 	}
 
 	/**
@@ -258,13 +253,13 @@ class KIG_History_Table extends WP_List_Table {
 		foreach ( $targets as $target ) {
 			switch ( $target ) {
 				case 'core':
-					$labels[] = esc_html__( 'Core', $this->textdomain );
+					$labels[] = esc_html__( 'Core', 'k-integrity-guard' );
 					break;
 				case 'plugins':
-					$labels[] = esc_html__( 'Plugins', $this->textdomain );
+					$labels[] = esc_html__( 'Plugins', 'k-integrity-guard' );
 					break;
 				case 'themes':
-					$labels[] = esc_html__( 'Themes', $this->textdomain );
+					$labels[] = esc_html__( 'Themes', 'k-integrity-guard' );
 					break;
 			}
 		}
@@ -299,13 +294,13 @@ class KIG_History_Table extends WP_List_Table {
 
 		switch ( $status ) {
 			case 'success':
-				return '<span class="wpig-status-badge wpig-status-success">' . esc_html__( 'Success', $this->textdomain ) . '</span>';
+				return '<span class="wpig-status-badge wpig-status-success">' . esc_html__( 'Success', 'k-integrity-guard' ) . '</span>';
 			case 'warning':
-				return '<span class="wpig-status-badge wpig-status-warning">' . esc_html__( 'Warning', $this->textdomain ) . '</span>';
+				return '<span class="wpig-status-badge wpig-status-warning">' . esc_html__( 'Warning', 'k-integrity-guard' ) . '</span>';
 			case 'error':
-				return '<span class="wpig-status-badge wpig-status-error">' . esc_html__( 'Error', $this->textdomain ) . '</span>';
+				return '<span class="wpig-status-badge wpig-status-error">' . esc_html__( 'Error', 'k-integrity-guard' ) . '</span>';
 			default:
-				return '<span class="wpig-status-badge wpig-status-unknown">' . esc_html__( 'Unknown', $this->textdomain ) . '</span>';
+				return '<span class="wpig-status-badge wpig-status-unknown">' . esc_html__( 'Unknown', 'k-integrity-guard' ) . '</span>';
 		}
 	}
 
@@ -324,6 +319,6 @@ class KIG_History_Table extends WP_List_Table {
 	 * Message when no items are found.
 	 */
 	public function no_items() {
-		esc_html_e( 'No scan history found. Run a scan to start tracking results.', $this->textdomain );
+		esc_html_e( 'No scan history found. Run a scan to start tracking results.', 'k-integrity-guard' );
 	}
 }

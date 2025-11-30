@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) exit;
 class KIG_Settings {
     const OPTION = 'kig_options';       // single array option
     const PAGE   = 'k_integrity_guard_settings';      // settings page slug used by Settings API
-    const TEXTDOMAIN     = 'k-integrity-guard'; // text domain
+
 
     public function __construct()
     {
@@ -33,16 +33,16 @@ class KIG_Settings {
         // Section: General
         add_settings_section(
             'kig_general',
-            __('General', self::TEXTDOMAIN),
+            __('General', 'k-integrity-guard'),
             function () {
-                echo '<p>' . esc_html__('Basic configuration for K'Integrity Guard.', self::TEXTDOMAIN) . '</p>';
+                echo '<p>' . esc_html__("Basic configuration for K'Integrity Guard.", 'k-integrity-guard') . '</p>';
             },
             self::PAGE
         );
 
         add_settings_field(
             'daily_scan_enabled',
-            __('Enable daily scan', self::TEXTDOMAIN),
+            __('Enable daily scan', 'k-integrity-guard'),
             [$this, 'field_daily_scan_enabled'],
             self::PAGE,
             'kig_general'
@@ -51,16 +51,16 @@ class KIG_Settings {
         // Section: Integrity Targets
         add_settings_section(
             'kig_targets',
-            __('Check integrity for', self::TEXTDOMAIN),
+            __('Check integrity for', 'k-integrity-guard'),
             function () {
-                echo '<p>' . esc_html__('Choose what to include in integrity checks.', self::TEXTDOMAIN) . '</p>';
+                echo '<p>' . esc_html__('Choose what to include in integrity checks.', 'k-integrity-guard') . '</p>';
             },
             self::PAGE
         );
 
         add_settings_field(
             'targets',
-            __('Targets', self::TEXTDOMAIN),
+            __('Targets', 'k-integrity-guard'),
             [$this, 'field_targets'],
             self::PAGE,
             'kig_targets'
@@ -131,7 +131,7 @@ class KIG_Settings {
             '<label><input type="checkbox" name="%1$s[daily_scan_enabled]" %2$s /> %3$s</label>',
             esc_attr(self::OPTION),
             checked(!empty($opts['daily_scan_enabled']), true, false),
-            esc_html__('Run the integrity scan once per day (via WP-Cron).', self::TEXTDOMAIN)
+            esc_html__('Run the integrity scan once per day (via WP-Cron).', 'k-integrity-guard')
         );
     }
 
@@ -141,9 +141,9 @@ class KIG_Settings {
         $targets = $opts['targets'] ?? [];
 
         $rows = [
-            'core'    => __('WordPress Core', self::TEXTDOMAIN),
-            'plugins' => __('Plugins', self::TEXTDOMAIN),
-            'themes'  => __('Themes', self::TEXTDOMAIN),
+            'core'    => __('WordPress Core', 'k-integrity-guard'),
+            'plugins' => __('Plugins', 'k-integrity-guard'),
+            'themes'  => __('Themes', 'k-integrity-guard'),
         ];
 
         echo '<fieldset>';
@@ -223,9 +223,9 @@ class KIG_Settings {
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'nonce'   => wp_create_nonce( 'kig_generate_checksum' ),
                 'l10n'    => array(
-                    'upToDate' => __( 'Up to date', self::TEXTDOMAIN ),
-                    'working'  => __( 'Working…', self::TEXTDOMAIN ),
-                    'error'    => __( 'Failed to generate checksum.', self::TEXTDOMAIN ),
+                    'upToDate' => __( 'Up to date', 'k-integrity-guard' ),
+                    'working'  => __( 'Working…', 'k-integrity-guard' ),
+                    'error'    => __( 'Failed to generate checksum.', 'k-integrity-guard' ),
                 ),
             )
         );
@@ -240,10 +240,10 @@ class KIG_Settings {
      */
     public function field_third_party_list() {
         if ( ! class_exists( 'KIG_Third_Party_Plugins_Table' ) ) {
-            require_once dirname( __FILE__ ) . '/class-wpig-third-party-table.php';
+            require_once dirname( __FILE__ ) . '/class-kig-third-party-table.php';
         }
         if ( ! class_exists( 'KIG_Utils' ) ) {
-            require_once dirname( __FILE__ ) . '/class-wpig-utils.php';
+            require_once dirname( __FILE__ ) . '/class-kig-utils.php';
         }
 
         $opts    = $this->get_options();
@@ -258,11 +258,11 @@ class KIG_Settings {
             }
 
             $name    = '' !== $plugin['name'] ? $plugin['name'] : $file;
-            $version = '' !== $plugin['version'] ? $plugin['version'] : __( 'Unknown', self::TEXTDOMAIN );
+            $version = '' !== $plugin['version'] ? $plugin['version'] : __( 'Unknown', 'k-integrity-guard' );
 
             $status_text = KIG_Utils::checksum_is_stale( $file )
-                ? __( 'Needs update', self::TEXTDOMAIN )
-                : __( 'Up to date', self::TEXTDOMAIN );
+                ? __( 'Needs update', 'k-integrity-guard' )
+                : __( 'Up to date', 'k-integrity-guard' );
 
             $items[] = array(
                 'name'    => esc_html( $name ),
@@ -277,12 +277,12 @@ class KIG_Settings {
                     esc_attr( self::OPTION ),
                     esc_attr( $file ),
                     checked( ! empty( $ignores[ $file ] ), true, false ),
-                    esc_html__( 'Ignore', self::TEXTDOMAIN )
+                    esc_html__( 'Ignore', 'k-integrity-guard' )
                 ),
                 'action'  => sprintf(
                     '<button type="button" class="button wpig-generate" data-plugin="%1$s">%2$s</button> <span class="spinner" style="float:none;"></span>',
                     esc_attr( $file ),
-                    esc_html__( 'Update Checksum', self::TEXTDOMAIN )
+                    esc_html__( 'Update Checksum', 'k-integrity-guard' )
                 ),
             );
         }
@@ -305,10 +305,10 @@ class KIG_Settings {
      */
     public function field_third_party_themes_list() {
         if ( ! class_exists( 'KIG_Third_Party_Themes_Table' ) ) {
-            require_once dirname( __FILE__ ) . '/class-wpig-third-party-table.php';
+            require_once dirname( __FILE__ ) . '/class-kig-third-party-table.php';
         }
         if ( ! class_exists( 'KIG_Utils' ) ) {
-            require_once dirname( __FILE__ ) . '/class-wpig-utils.php';
+            require_once dirname( __FILE__ ) . '/class-kig-utils.php';
         }
 
         $opts    = $this->get_options();
@@ -323,11 +323,11 @@ class KIG_Settings {
             }
 
             $name    = '' !== $theme['name'] ? $theme['name'] : $stylesheet;
-            $version = '' !== $theme['version'] ? $theme['version'] : __( 'Unknown', self::TEXTDOMAIN );
+            $version = '' !== $theme['version'] ? $theme['version'] : __( 'Unknown', 'k-integrity-guard' );
 
             $status_text = KIG_Utils::theme_checksum_is_stale( $stylesheet )
-                ? __( 'Needs update', self::TEXTDOMAIN )
-                : __( 'Up to date', self::TEXTDOMAIN );
+                ? __( 'Needs update', 'k-integrity-guard' )
+                : __( 'Up to date', 'k-integrity-guard' );
 
             $items[] = array(
                 'name'    => esc_html( $name ),
@@ -342,12 +342,12 @@ class KIG_Settings {
                     esc_attr( self::OPTION ),
                     esc_attr( $stylesheet ),
                     checked( ! empty( $ignores[ $stylesheet ] ), true, false ),
-                    esc_html__( 'Ignore', self::TEXTDOMAIN )
+                    esc_html__( 'Ignore', 'k-integrity-guard' )
                 ),
                 'action'  => sprintf(
                     '<button type="button" class="button wpig-theme-generate" data-theme="%1$s">%2$s</button> <span class="spinner" style="float:none;"></span>',
                     esc_attr( $stylesheet ),
-                    esc_html__( 'Update Checksum', self::TEXTDOMAIN )
+                    esc_html__( 'Update Checksum', 'k-integrity-guard' )
                 ),
             );
         }
@@ -364,13 +364,13 @@ class KIG_Settings {
     /** AJAX handler: Generate checksum JSON for a plugin */
     public function ajax_generate_checksum() {
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Access denied.', self::TEXTDOMAIN)], 403);
+            wp_send_json_error(['message' => __('Access denied.', 'k-integrity-guard')], 403);
         }
         check_ajax_referer('kig_generate_checksum', 'nonce');
 
         $plugin_file = isset($_POST['plugin_file']) ? sanitize_text_field(wp_unslash($_POST['plugin_file'])) : '';
         if ('' === $plugin_file) {
-            wp_send_json_error(['message' => __('Invalid plugin.', self::TEXTDOMAIN)], 400);
+            wp_send_json_error(['message' => __('Invalid plugin.', 'k-integrity-guard')], 400);
         }
 
         if (!class_exists('KIG_Utils')) {
@@ -383,7 +383,7 @@ class KIG_Settings {
         }
 
         wp_send_json_success([
-            'status' => __('Up to date', self::TEXTDOMAIN),
+            'status' => __('Up to date', 'k-integrity-guard'),
         ]);
     }
 
@@ -394,13 +394,13 @@ class KIG_Settings {
      */
     public function ajax_generate_theme_checksum() {
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Access denied.', self::TEXTDOMAIN)], 403);
+            wp_send_json_error(['message' => __('Access denied.', 'k-integrity-guard')], 403);
         }
         check_ajax_referer('kig_generate_checksum', 'nonce');
 
         $stylesheet = isset($_POST['stylesheet']) ? sanitize_text_field(wp_unslash($_POST['stylesheet'])) : '';
         if ('' === $stylesheet) {
-            wp_send_json_error(['message' => __('Invalid theme.', self::TEXTDOMAIN)], 400);
+            wp_send_json_error(['message' => __('Invalid theme.', 'k-integrity-guard')], 400);
         }
 
         if (!class_exists('KIG_Utils')) {
@@ -413,7 +413,7 @@ class KIG_Settings {
         }
 
         wp_send_json_success([
-            'status' => __('Up to date', self::TEXTDOMAIN),
+            'status' => __('Up to date', 'k-integrity-guard'),
         ]);
     }
 }

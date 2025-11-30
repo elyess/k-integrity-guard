@@ -24,7 +24,7 @@ require_once __DIR__ . '/includes/class-kig-history-table.php';
 class K_Integrity_Guard {
 
 	const VERSION = '1.1.0';
-	const TEXTDOMAIN = 'k-integrity-guard';
+
 
 	const CAPABILITY = 'manage_options';
 
@@ -43,7 +43,7 @@ class K_Integrity_Guard {
 		$this->plugin_file = __FILE__;
 		$this->settings = new KIG_Settings();
 		$this->db = new KIG_DB();
-		$this->scan = new KIG_Scan( $this->plugin_file, self::SLUG_SCAN, $this->settings, self::TEXTDOMAIN, self::VERSION, $this->db );
+		$this->scan = new KIG_Scan( $this->plugin_file, self::SLUG_SCAN, $this->settings, self::VERSION, $this->db );
 		add_action('admin_menu', [$this, 'register_admin_menu']);
 		add_filter('plugin_action_links_' . plugin_basename($this->plugin_file), [$this, 'plugin_action_links']);
 		add_action('admin_notices',        [$this, 'show_first_scan_notice']);
@@ -101,8 +101,8 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
 	public function register_admin_menu() {
 		add_menu_page(
-			__('K'Integrity Guard', self::TEXTDOMAIN),
-			__('Integrity Guard', self::TEXTDOMAIN),
+			__("K'Integrity Guard", 'k-integrity-guard'),
+			__('Integrity Guard', 'k-integrity-guard'),
 			self::CAPABILITY,
 			self::SLUG_SCAN,
 			[$this, 'render_scan_page'],
@@ -112,8 +112,8 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
 		add_submenu_page(
 			self::SLUG_SCAN,
-			__('Scan', self::TEXTDOMAIN),
-			__('Scan', self::TEXTDOMAIN),
+			__('Scan', 'k-integrity-guard'),
+			__('Scan', 'k-integrity-guard'),
 			self::CAPABILITY,
 			self::SLUG_SCAN,
 			[$this, 'render_scan_page']
@@ -121,8 +121,8 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
 		add_submenu_page(
 			self::SLUG_SCAN,
-			__('Settings', self::TEXTDOMAIN),
-			__('Settings', self::TEXTDOMAIN),
+			__('Settings', 'k-integrity-guard'),
+			__('Settings', 'k-integrity-guard'),
 			self::CAPABILITY,
 			self::SLUG_SETTINGS,
 			[$this, 'render_settings_page']
@@ -130,8 +130,8 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
 		add_submenu_page(
 			self::SLUG_SCAN,
-			__('History', self::TEXTDOMAIN),
-			__('History', self::TEXTDOMAIN),
+			__('History', 'k-integrity-guard'),
+			__('History', 'k-integrity-guard'),
 			self::CAPABILITY,
 			self::SLUG_HISTORY,
 			[$this, 'render_history_page']
@@ -142,27 +142,27 @@ add_action('admin_enqueue_scripts', function ($hook) {
 		$settings_url = admin_url('admin.php?page=' . self::SLUG_SETTINGS);
 		array_unshift(
 				$links,
-				'<a href="' . esc_url($settings_url) . '">' . esc_html__('Settings', self::TEXTDOMAIN) . '</a>',
-				'<a href="' . esc_url(admin_url('admin.php?page=' . self::SLUG_SCAN)) . '">' . esc_html__('Scan Now', self::TEXTDOMAIN) . '</a>'
+				'<a href="' . esc_url($settings_url) . '">' . esc_html__('Settings', 'k-integrity-guard') . '</a>',
+				'<a href="' . esc_url(admin_url('admin.php?page=' . self::SLUG_SCAN)) . '">' . esc_html__('Scan Now', 'k-integrity-guard') . '</a>'
 		);
 		return $links;
 	}
 
 	public function render_scan_page(): void {
-			if (!current_user_can(self::CAPABILITY)) wp_die(__('You do not have permission.', self::TEXTDOMAIN));
+			if (!current_user_can(self::CAPABILITY)) wp_die(__('You do not have permission.', 'k-integrity-guard'));
 			$scan = $this->scan;
 			$settings = $this->settings;
 			include __DIR__ . '/includes/views/scan.php';
 	}
 
 	public function render_history_page(): void {
-			if (!current_user_can(self::CAPABILITY)) wp_die(__('You do not have permission.', self::TEXTDOMAIN));
+			if (!current_user_can(self::CAPABILITY)) wp_die(__('You do not have permission.', 'k-integrity-guard'));
 			include __DIR__ . '/includes/views/history.php';
 	}
 
 	public function render_settings_page(): void {
 			if ( ! current_user_can( self::CAPABILITY ) ) {
-				wp_die( esc_html__( 'You do not have permission.', self::TEXTDOMAIN ) );
+				wp_die( esc_html__( 'You do not have permission.', 'k-integrity-guard' ) );
 			}
 			$settings = $this->settings;
 			include __DIR__ . '/includes/views/settings.php';
@@ -207,11 +207,11 @@ public function show_first_scan_notice() {
     $nonce = wp_create_nonce('kig_dismiss_first_scan_notice');
 
     echo '<div class="notice notice-info is-dismissible kig-first-scan-notice" data-nonce="' . esc_attr($nonce) . '">';
-    echo '<p><strong>' . esc_html__('K'Integrity Guard is active.', self::TEXTDOMAIN) . '</strong></p>';
-    echo '<p>' . esc_html__('You can run your first scan now or review the scan settings.', self::TEXTDOMAIN) . '</p>';
+    echo '<p><strong>' . esc_html__("K'Integrity Guard is active.", 'k-integrity-guard') . '</strong></p>';
+    echo '<p>' . esc_html__('You can run your first scan now or review the scan settings.', 'k-integrity-guard') . '</p>';
     echo '<p>';
-    echo '<a href="' . esc_url($scan_url) . '" class="button button-primary">' . esc_html__('Run first scan', self::TEXTDOMAIN) . '</a> ';
-    echo '<a href="' . esc_url($settings_url) . '" class="button">' . esc_html__('Review settings', self::TEXTDOMAIN) . '</a>';
+    echo '<a href="' . esc_url($scan_url) . '" class="button button-primary">' . esc_html__('Run first scan', 'k-integrity-guard') . '</a> ';
+    echo '<a href="' . esc_url($settings_url) . '" class="button">' . esc_html__('Review settings', 'k-integrity-guard') . '</a>';
     echo '</p>';
     echo '</div>';
 	}
@@ -280,13 +280,13 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
     $url     = admin_url('admin.php?page=' . self::SLUG_SETTINGS);
 
     echo '<div class="notice notice-warning is-dismissible">';
-    echo '<p><strong>' . esc_html__('Third-party plugin versions changed.', self::TEXTDOMAIN) . '</strong></p>';
-    echo '<p>' . esc_html__('Please regenerate checksums for:', self::TEXTDOMAIN) . '</p><ul>';
+    echo '<p><strong>' . esc_html__('Third-party plugin versions changed.', 'k-integrity-guard') . '</strong></p>';
+    echo '<p>' . esc_html__('Please regenerate checksums for:', 'k-integrity-guard') . '</p><ul>';
     foreach ($todo as $file) {
         $name = isset($plugins[$file]['Name']) ? $plugins[$file]['Name'] : $file;
         echo '<li>' . esc_html($name . ' (' . $file . ')') . '</li>';
     }
-	    echo '</ul><p><a class="button button-primary" href="' . esc_url($url) . '">' . esc_html__('Open settings to regenerate', self::TEXTDOMAIN) . '</a></p></div>';
+	    echo '</ul><p><a class="button button-primary" href="' . esc_url($url) . '">' . esc_html__('Open settings to regenerate', 'k-integrity-guard') . '</a></p></div>';
 	}
 
 	/** Capture theme updates/installs and mark changed themes. */
@@ -348,14 +348,14 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	    $url = admin_url('admin.php?page=' . self::SLUG_SETTINGS);
 
 	    echo '<div class="notice notice-warning is-dismissible">';
-	    echo '<p><strong>' . esc_html__('Third-party theme versions changed.', self::TEXTDOMAIN) . '</strong></p>';
-	    echo '<p>' . esc_html__('Please regenerate checksums for:', self::TEXTDOMAIN) . '</p><ul>';
+	    echo '<p><strong>' . esc_html__('Third-party theme versions changed.', 'k-integrity-guard') . '</strong></p>';
+	    echo '<p>' . esc_html__('Please regenerate checksums for:', 'k-integrity-guard') . '</p><ul>';
 	    foreach ($todo as $stylesheet) {
 	        $theme = wp_get_theme($stylesheet);
 	        $name  = $theme->exists() ? $theme->get('Name') : $stylesheet;
 	        echo '<li>' . esc_html($name . ' (' . $stylesheet . ')') . '</li>';
 	    }
-	    echo '</ul><p><a class="button button-primary" href="' . esc_url($url) . '">' . esc_html__('Open settings to regenerate', self::TEXTDOMAIN) . '</a></p></div>';
+	    echo '</ul><p><a class="button button-primary" href="' . esc_url($url) . '">' . esc_html__('Open settings to regenerate', 'k-integrity-guard') . '</a></p></div>';
 	}
 
 
