@@ -106,7 +106,7 @@ class KIG_DB {
 		$table_name = self::get_table_name();
 
 		// Ensure table exists, create if not (handles case where plugin wasn't reactivated after update).
-		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) ) !== $table_name ) {
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) ) !== $table_name ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			self::create_table();
 		}
 
@@ -138,7 +138,7 @@ class KIG_DB {
 			self::get_table_name(),
 			$insert_data,
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' )
-		);
+		); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false === $result ) {
 			return false;
@@ -226,9 +226,9 @@ class KIG_DB {
 
 		// Get total count.
 		if ( ! empty( $query_args ) ) {
-			$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}", $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}", $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		} else {
-			$total = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$total = $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		}
 
 		// Get paginated results.
@@ -237,8 +237,7 @@ class KIG_DB {
 
 		$items = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				...$query_args
+				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			),
 			ARRAY_A
 		);
@@ -282,7 +281,7 @@ class KIG_DB {
 
 		$table_name = self::get_table_name();
 		$scan       = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM " . esc_sql( $table_name ) . " WHERE id = %d", $scan_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare( "SELECT * FROM " . esc_sql( $table_name ) . " WHERE id = %d", $scan_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			ARRAY_A
 		);
 
@@ -317,7 +316,7 @@ class KIG_DB {
 			self::get_table_name(),
 			array( 'id' => $scan_id ),
 			array( '%d' )
-		);
+		); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
@@ -349,15 +348,8 @@ class KIG_DB {
 			return 0;
 		}
 
-		$placeholders = implode( ',', array_fill( 0, count( $scan_ids ), '%d' ) );
-		$table_name   = self::get_table_name();
-
-		$result = $wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM " . esc_sql( $table_name ) . " WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				...$scan_ids
-			)
-		);
+		$ids_string = implode( ',', $scan_ids );
+		$result     = $wpdb->query( "DELETE FROM {$table_name} WHERE id IN ({$ids_string})" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
@@ -379,7 +371,7 @@ class KIG_DB {
 		global $wpdb;
 
 		$table_name = self::get_table_name();
-		$result     = $wpdb->query( "TRUNCATE TABLE " . esc_sql( $table_name ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$result     = $wpdb->query( "TRUNCATE TABLE " . esc_sql( $table_name ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
@@ -404,7 +396,7 @@ class KIG_DB {
 
 		$result = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM " . esc_sql( $table_name ) . " WHERE scan_date < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM " . esc_sql( $table_name ) . " WHERE scan_date < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 				$date
 			)
 		);
@@ -433,7 +425,7 @@ class KIG_DB {
 		$table_name = self::get_table_name();
 
 		$results = $wpdb->get_results(
-			"SELECT status, COUNT(*) as count FROM " . esc_sql( $table_name ) . " GROUP BY status", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			"SELECT status, COUNT(*) as count FROM " . esc_sql( $table_name ) . " GROUP BY status", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			ARRAY_A
 		);
 

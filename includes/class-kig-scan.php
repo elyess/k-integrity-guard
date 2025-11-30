@@ -1362,8 +1362,16 @@ class KIG_Scan {
 		$has_issues   = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
 		$status       = $has_issues ? 'issues' : 'ok';
 		$message      = $has_issues
-			? sprintf( __( 'Differences detected in plugin %s.', 'k-integrity-guard' ), $name )
-			: sprintf( __( 'Plugin %s matches the official checksums.', 'k-integrity-guard' ), $name );
+			? sprintf(
+				/* translators: %s: Plugin name. */
+				__( 'Differences detected in plugin %s.', 'k-integrity-guard' ),
+				$name
+			)
+			: sprintf(
+				/* translators: %s: Plugin name. */
+				__( 'Plugin %s matches the official checksums.', 'k-integrity-guard' ),
+				$name
+			);
 
 		return array(
 			'status'   => $status,
@@ -1812,8 +1820,16 @@ class KIG_Scan {
 		$has_issues = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
 		$status     = $has_issues ? 'issues' : 'ok';
 		$message    = $has_issues
-			? sprintf( __( 'Differences detected in theme %s.', 'k-integrity-guard' ), $name )
-			: sprintf( __( 'Theme %s matches the official checksums.', 'k-integrity-guard' ), $name );
+			? sprintf(
+				/* translators: %s: Theme name. */
+				__( 'Differences detected in theme %s.', 'k-integrity-guard' ),
+				$name
+			)
+			: sprintf(
+				/* translators: %s: Theme name. */
+				__( 'Theme %s matches the official checksums.', 'k-integrity-guard' ),
+				$name
+			);
 
 		return array(
 			'status'   => $status,
@@ -2840,8 +2856,16 @@ $comparison = $this->compare_extension_files( $root, $checksums_data['files'], $
 $has_issues = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
 $status     = $has_issues ? 'issues' : 'ok';
 $message    = $has_issues
-? sprintf( __( 'Changes detected in plugin %s.', 'k-integrity-guard' ), $name )
-: sprintf( __( 'Plugin %s matches snapshot.', 'k-integrity-guard' ), $name );
+			? sprintf(
+				/* translators: %s: Plugin name. */
+				__( 'Changes detected in plugin %s.', 'k-integrity-guard' ),
+				$name
+			)
+			: sprintf(
+				/* translators: %s: Plugin name. */
+				__( 'Plugin %s matches snapshot.', 'k-integrity-guard' ),
+				$name
+			);
 
 return array(
 'status'   => $status,
