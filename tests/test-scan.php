@@ -64,7 +64,7 @@ class Test_KIG_Scan extends WP_UnitTestCase {
 			'wp-content/themes/kig-deleted-theme/style.css' => 'e',
 		);
 		$allowed  = array();
-		$filtered = $this->call( 'filter_core_checksums', array( $checksums, true, &$allowed ) );
+		$filtered = $this->call( 'filter_core_checksums', array( $checksums, &$allowed ) );
 
 		$this->assertSame( array( 'wp-login.php', 'wp-content/themes/index.php' ), array_keys( $filtered ) );
 		$this->assertNotContains( 'wp-content/themes', $allowed );

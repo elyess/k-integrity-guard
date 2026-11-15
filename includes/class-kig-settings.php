@@ -315,11 +315,7 @@ class KIG_Settings {
         $items = array();
 
         foreach ( $sources as $stylesheet => $theme ) {
-            // WordPress.org publishes no theme checksums, so every theme needs a snapshot; bundled themes are checked by the core scan.
-            if ( in_array( $stylesheet, KIG_Scan::WP_DEFAULT_THEMES, true ) ) {
-                continue;
-            }
-
+            // WordPress.org publishes no theme checksums, so every theme can get a snapshot.
             $name    = '' !== $theme['name'] ? $theme['name'] : $stylesheet;
             $version = '' !== $theme['version'] ? $theme['version'] : __( 'Unknown', 'k-integrity-guard' );
 

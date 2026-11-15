@@ -31,29 +31,6 @@ class KIG_Scan {
 	private const MAX_SYNC_STEPS = 5000;
 
 	/**
-	 * WordPress default bundled themes.
-	 *
-	 * These themes are verified as part of WordPress core scan.
-	 */
-	const WP_DEFAULT_THEMES = array(
-		'twentytwentyfive',
-		'twentytwentyfour',
-		'twentytwentythree',
-		'twentytwentytwo',
-		'twentytwentyone',
-		'twentytwenty',
-		'twentynineteen',
-		'twentyseventeen',
-		'twentysixteen',
-		'twentyfifteen',
-		'twentyfourteen',
-		'twentythirteen',
-		'twentytwelve',
-		'twentyeleven',
-		'twentyten',
-	);
-
-	/**
 	 * Absolute path to the main plugin file.
 	 *
 	 * @var string
@@ -398,12 +375,6 @@ class KIG_Scan {
 			);
 		}
 
-		$include_core_themes = in_array( 'themes', $targets, true );
-
-		if ( $include_core_themes && isset( $target_states['core'] ) ) {
-			$target_states['core']['include_core_themes'] = true;
-		}
-
 		return array(
 			'context'        => $context,
 			'targets'        => array_values( $targets ),
@@ -657,8 +628,6 @@ class KIG_Scan {
 		$state['version'] = $version;
 		$state['locale']  = $locale;
 
-		$include_themes = ! empty( $state['include_core_themes'] );
-
 		$checksums = $this->fetch_core_checksums( $version, $locale );
 
 		if ( is_wp_error( $checksums ) ) {
@@ -668,7 +637,7 @@ class KIG_Scan {
 		$state['locale'] = $checksums['locale'];
 
 		$allowed_theme_dirs = array();
-		$filtered           = $this->filter_core_checksums( $checksums['checksums'], $include_themes, $allowed_theme_dirs );
+		$filtered           = $this->filter_core_checksums( $checksums['checksums'], $allowed_theme_dirs );
 		$files              = array_keys( $filtered );
 
 		$state['files']     = $files;
@@ -770,11 +739,10 @@ class KIG_Scan {
 	 * never the whole themes folder, so other themes are not reported as unexpected files.
 	 *
 	 * @param array<string,string> $checksums          Raw checksum map.
-	 * @param bool                 $include_themes     Whether to retain default theme checksums.
-	 * @param array<int,string>    $allowed_theme_dirs Populated with allowed theme paths when themes are included. Passed by reference.
+	 * @param array<int,string>    $allowed_theme_dirs Populated with the bundled theme paths to walk. Passed by reference.
 	 * @return array<string,string>
 	 */
-	private function filter_core_checksums( array $checksums, bool $include_themes = false, array &$allowed_theme_dirs = array() ): array {
+	private function filter_core_checksums( array $checksums, array &$allowed_theme_dirs = array() ): array {
 		$filtered   = array();
 		$theme_dirs = array();
 		$root       = trailingslashit( ABSPATH );
@@ -782,11 +750,8 @@ class KIG_Scan {
 		foreach ( $checksums as $path => $hash ) {
 			$normalized = ltrim( wp_normalize_path( (string) $path ), '/' );
 
+			// Bundled themes are always checked here: they ship with WordPress and need no snapshot.
 			if ( 0 === strpos( $normalized, 'wp-content/themes/' ) ) {
-				if ( ! $include_themes ) {
-					continue;
-				}
-
 				if ( 'wp-content/themes/index.php' === $normalized ) {
 					$theme_dirs[ $normalized ] = true;
 				} else {
@@ -964,29 +929,14 @@ class KIG_Scan {
 		$modified = count( $state['modified'] ?? array() );
 		$missing  = count( $state['missing'] ?? array() );
 		$added    = count( $state['added'] ?? array() );
-		$includes_themes = ! empty( $state['include_core_themes'] );
 
 		if ( 0 === $modified && 0 === $missing && 0 === $added ) {
-			if ( $includes_themes ) {
-				return __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
-			}
-
-			return __( 'WordPress core scan completed without integrity issues.', 'k-integrity-guard' );
-		}
-
-		if ( $includes_themes ) {
-			return sprintf(
-				/* translators: 1: modified count, 2: missing count, 3: added count. */
-				__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
-				$modified,
-				$missing,
-				$added
-			);
+			return __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
 		}
 
 		return sprintf(
 			/* translators: 1: modified count, 2: missing count, 3: added count. */
-			__( 'WordPress core issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
+			__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
 			$modified,
 			$missing,
 			$added
@@ -1023,7 +973,6 @@ class KIG_Scan {
 			'status'          => $state['status'] ?? 'unknown',
 			'version'         => $state['version'] ?? '',
 			'locale'          => $state['locale'] ?? '',
-			'themes_included' => ! empty( $state['include_core_themes'] ),
 			'summary'         => $summary,
 			'items'           => array(
 				array(
@@ -1402,8 +1351,6 @@ class KIG_Scan {
 
 			if ( $theme->get( 'Template' ) ) {
 				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Child theme - inherits from parent.', 'k-integrity-guard' ) );
-			} elseif ( in_array( $stylesheet, self::WP_DEFAULT_THEMES, true ) ) {
-				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Default WordPress theme - verified with core scan.', 'k-integrity-guard' ) );
 			} elseif ( empty( $info['is_wporg'] ) ) {
 				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Not available on WordPress.org.', 'k-integrity-guard' ) );
 			} elseif ( ! empty( $ignores[ $stylesheet ] ) ) {
