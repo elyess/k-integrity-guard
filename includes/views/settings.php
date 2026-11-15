@@ -40,9 +40,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<!-- Third-party Themes Section -->
 	<div class="wpig-third-party-section">
-		<h2><?php esc_html_e( 'Third-party Themes', 'k-integrity-guard' ); ?></h2>
+		<h2><?php esc_html_e( 'Theme Snapshots', 'k-integrity-guard' ); ?></h2>
 		<p class="description">
-			<?php esc_html_e( 'Themes not detected as hosted on WordPress.org. Ignore them or generate checksums for integrity verification.', 'k-integrity-guard' ); ?>
+			<?php esc_html_e( 'WordPress.org does not publish theme checksums, so themes are verified against a snapshot. Generate one for each theme you want checked, or ignore it. Bundled default themes are checked by the core scan.', 'k-integrity-guard' ); ?>
 		</p>
 
 		<form method="post" action="options.php" id="wpig-third-party-themes-form">

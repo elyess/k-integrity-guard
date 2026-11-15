@@ -159,7 +159,7 @@ class KIG_Settings {
         $rows = [
             'core'    => __('WordPress Core', 'k-integrity-guard'),
             'plugins' => __('Plugins', 'k-integrity-guard'),
-            'themes'  => __('Themes', 'k-integrity-guard'),
+            'themes'  => __('WordPress.org Themes (snapshot)', 'k-integrity-guard'),
             'third_party_plugins' => __('Third-Party Plugins (snapshot)', 'k-integrity-guard'),
             'third_party_themes'  => __('Third-Party Themes (snapshot)', 'k-integrity-guard'),
         ];
@@ -315,7 +315,8 @@ class KIG_Settings {
         $items = array();
 
         foreach ( $sources as $stylesheet => $theme ) {
-            if ( ! empty( $theme['is_wporg'] ) ) {
+            // WordPress.org publishes no theme checksums, so every theme needs a snapshot; bundled themes are checked by the core scan.
+            if ( in_array( $stylesheet, KIG_Scan::WP_DEFAULT_THEMES, true ) ) {
                 continue;
             }
 

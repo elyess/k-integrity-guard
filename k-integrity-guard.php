@@ -373,7 +373,9 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	    $todo = [];
 	    foreach ($changed as $stylesheet) {
 	        if (!empty($ignores[$stylesheet])) continue;
-	        if (empty($sources[$stylesheet]) || !empty($sources[$stylesheet]['is_wporg'])) continue;
+	        if (empty($sources[$stylesheet])) continue;
+	        // WordPress.org themes are snapshot-checked too, but only nag when the admin already made a snapshot.
+	        if (!empty($sources[$stylesheet]['is_wporg']) && null === KIG_Utils::read_theme_checksum_json($stylesheet)) continue;
 	        if (KIG_Utils::theme_checksum_is_stale($stylesheet)) {
 	            $todo[] = $stylesheet;
 	        }

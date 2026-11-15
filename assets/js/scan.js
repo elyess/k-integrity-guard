@@ -157,7 +157,8 @@
 
 		summaryArea.show();
 
-		var core = results && results.core ? results.core : null;
+		// Core file lists live in core.items[0], like the other targets.
+		var core = results && results.core ? ( isArray( results.core.items ) && results.core.items[0] ? results.core.items[0] : results.core ) : null;
 		var extensionTargets = [
 			{ key: 'plugins', heading: settings.text.pluginsHeading || 'Plugins' },
 			{ key: 'themes', heading: settings.text.themesHeading || 'Themes' },

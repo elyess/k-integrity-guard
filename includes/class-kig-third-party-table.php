@@ -163,7 +163,7 @@ class KIG_Third_Party_Themes_Table extends WP_List_Table {
 	 * Message when no rows.
 	 */
 	public function no_items() {
-		esc_html_e( 'No third-party themes detected.', 'k-integrity-guard' );
+		esc_html_e( 'No themes detected.', 'k-integrity-guard' );
 	}
 }
 

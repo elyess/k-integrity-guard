@@ -35,7 +35,7 @@ class KIG_Scan {
 	 *
 	 * These themes are verified as part of WordPress core scan.
 	 */
-	private const WP_DEFAULT_THEMES = array(
+	const WP_DEFAULT_THEMES = array(
 		'twentytwentyfive',
 		'twentytwentyfour',
 		'twentytwentythree',
@@ -680,12 +680,6 @@ class KIG_Scan {
 		$state['added']     = array();
 		$state['errors']    = array();
 
-		if ( $include_themes ) {
-			$state['allowed_theme_dirs'] = $allowed_theme_dirs;
-		} else {
-			unset( $state['allowed_theme_dirs'] );
-		}
-
 		$state['actual_files'] = $this->list_core_files( $allowed_theme_dirs );
 
 		return true;
@@ -845,42 +839,6 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Determine whether a path belongs to an allowed default theme directory.
-	 *
-	 * @param string        $path               Relative path from ABSPATH.
-	 * @param array<int,string> $allowed_theme_dirs Allowed theme directory prefixes.
-	 * @return bool
-	 */
-	private function is_allowed_theme_path( string $path, array $allowed_theme_dirs ): bool {
-		if ( empty( $allowed_theme_dirs ) ) {
-			return false;
-		}
-
-		$normalized = ltrim( wp_normalize_path( $path ), '/' );
-
-		foreach ( $allowed_theme_dirs as $allowed ) {
-			$allowed = ltrim( wp_normalize_path( $allowed ), '/' );
-
-			if ( $normalized === $allowed ) {
-				return true;
-			}
-
-			$allowed_with_slash   = $allowed . '/';
-			$normalized_with_slash = $normalized . '/';
-
-			if ( 0 === strpos( $normalized, $allowed_with_slash ) ) {
-				return true;
-			}
-
-			if ( 0 === strpos( $allowed_with_slash, $normalized_with_slash ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
 	 * Process a chunk of core files.
 	 *
 	 * @param array<string,mixed> $state Target state (passed by reference).
@@ -993,7 +951,7 @@ class KIG_Scan {
 
 		$state['modified'] = array_values( $state['modified'] );
 
-		unset( $state['files'], $state['actual_files'], $state['pointer'], $state['allowed_theme_dirs'] );
+		unset( $state['files'], $state['actual_files'], $state['pointer'] );
 	}
 
 	/**
@@ -1038,7 +996,7 @@ class KIG_Scan {
 	/**
 	 * Build summarized core result payload.
 	 *
-	 * Keeps the flat fields the live scan screen reads and adds the items/totals shape used by history.
+	 * Uses the same items/totals shape as the other targets; the file lists live in items[0].
 	 *
 	 * @param array<string,mixed> $state Target state.
 	 * @return array<string,mixed>
@@ -1066,10 +1024,6 @@ class KIG_Scan {
 			'version'         => $state['version'] ?? '',
 			'locale'          => $state['locale'] ?? '',
 			'themes_included' => ! empty( $state['include_core_themes'] ),
-			'modified'        => $modified,
-			'missing'         => $missing,
-			'added'           => $added,
-			'errors'          => $errors,
 			'summary'         => $summary,
 			'items'           => array(
 				array(
@@ -1115,8 +1069,8 @@ class KIG_Scan {
 			'themes'              => array(
 				'label'   => $labels['themes'],
 				'prepare' => 'prepare_wporg_themes',
-				'verify'  => 'verify_wporg_theme',
-				'empty'   => __( 'No WordPress.org themes were available for verification.', 'k-integrity-guard' ),
+				'verify'  => 'verify_theme_snapshot',
+				'empty'   => __( 'No WordPress.org themes with snapshots were available for verification.', 'k-integrity-guard' ),
 			),
 			'third_party_plugins' => array(
 				'label'   => $labels['third_party_plugins'],
@@ -1127,7 +1081,7 @@ class KIG_Scan {
 			'third_party_themes'  => array(
 				'label'   => $labels['third_party_themes'],
 				'prepare' => 'prepare_third_party_themes',
-				'verify'  => 'verify_third_party_theme',
+				'verify'  => 'verify_theme_snapshot',
 				'empty'   => __( 'No third-party themes with snapshots were available for verification.', 'k-integrity-guard' ),
 			),
 		);
@@ -1425,11 +1379,15 @@ class KIG_Scan {
 	}
 
 	/**
-	 * List WordPress.org themes to verify against the official checksums.
+	 * List WordPress.org themes to verify against their local snapshots.
+	 *
+	 * WordPress.org publishes no theme checksums, so these themes need a snapshot like third-party themes.
 	 *
 	 * @return array{items:array<string,array<string,string>>,skipped:array<int,array<string,string>>}
 	 */
 	private function prepare_wporg_themes(): array {
+		$options = $this->settings->get_options();
+		$ignores = $options['third_party_themes']['ignore'] ?? array();
 		$items   = array();
 		$skipped = array();
 
@@ -1448,8 +1406,10 @@ class KIG_Scan {
 				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Default WordPress theme - verified with core scan.', 'k-integrity-guard' ) );
 			} elseif ( empty( $info['is_wporg'] ) ) {
 				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Not available on WordPress.org.', 'k-integrity-guard' ) );
-			} elseif ( '' === $version ) {
-				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Version could not be determined.', 'k-integrity-guard' ) );
+			} elseif ( ! empty( $ignores[ $stylesheet ] ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Ignored by user.', 'k-integrity-guard' ) );
+			} elseif ( null === KIG_Utils::read_theme_checksum_json( $stylesheet ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'WordPress.org does not publish theme checksums. Generate a snapshot in Settings.', 'k-integrity-guard' ) );
 			} else {
 				$items[ $stylesheet ] = array(
 					'name'    => $name,
@@ -1565,31 +1525,6 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Verify a WordPress.org theme against the official checksums.
-	 *
-	 * @param array<string,mixed> $item Item with key (stylesheet) and version.
-	 * @return array<string,mixed>|WP_Error Comparison result.
-	 */
-	private function verify_wporg_theme( array $item ) {
-		$root = wp_get_theme( $item['key'] )->get_stylesheet_directory();
-		if ( ! $root || ! is_dir( $root ) ) {
-			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', 'k-integrity-guard' ) );
-		}
-
-		$checksums = $this->fetch_theme_checksums( $item['key'], $item['version'] );
-		if ( is_wp_error( $checksums ) ) {
-			return $checksums;
-		}
-
-		$map = $this->normalize_checksum_map( $checksums['checksums'], array( $item['key'] ) );
-		if ( empty( $map ) ) {
-			return new WP_Error( 'kig_missing_theme_checksums', __( 'Theme checksums were not provided.', 'k-integrity-guard' ) );
-		}
-
-		return $this->compare_extension_files( $root, $map, $checksums['checksum_type'], true );
-	}
-
-	/**
 	 * Verify a third-party plugin against its local snapshot.
 	 *
 	 * @param array<string,mixed> $item Item with key (plugin file) and version.
@@ -1617,12 +1552,14 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Verify a third-party theme against its local snapshot.
+	 * Verify a theme against its local snapshot.
+	 *
+	 * Used for WordPress.org themes too: WordPress.org publishes no theme checksums.
 	 *
 	 * @param array<string,mixed> $item Item with key (stylesheet) and version.
 	 * @return array<string,mixed>|WP_Error Comparison result.
 	 */
-	private function verify_third_party_theme( array $item ) {
+	private function verify_theme_snapshot( array $item ) {
 		$root = wp_get_theme( $item['key'] )->get_stylesheet_directory();
 		if ( ! $root || ! is_dir( $root ) ) {
 			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', 'k-integrity-guard' ) );
@@ -1710,69 +1647,6 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Retrieve theme checksums from WordPress.org.
-	 *
-	 * @param string $slug    Theme slug (stylesheet).
-	 * @param string $version Theme version.
-	 * @return array<string,mixed>|WP_Error
-	 */
-	private function fetch_theme_checksums( string $slug, string $version ) {
-		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_theme_checksum_args', __( 'Invalid theme checksum request.', 'k-integrity-guard' ) );
-		}
-
-		$url = sprintf( 'https://api.wordpress.org/themes/checksums/1.0/%1$s/%2$s', rawurlencode( $slug ), rawurlencode( $version ) );
-		$url = add_query_arg(
-			array(
-				'locale' => $this->determine_request_locale(),
-			),
-			$url
-		);
-
-		$request = wp_remote_get(
-			$url,
-			array(
-				'timeout'   => 20,
-				'user-agent' => 'K\'Integrity Guard/' . $this->version,
-			)
-		);
-
-		if ( is_wp_error( $request ) ) {
-			return $request;
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $request );
-		if ( 200 !== $code ) {
-			return new WP_Error( 'kig_theme_checksum_http', __( 'Unable to download theme checksums.', 'k-integrity-guard' ) );
-		}
-
-		$body = wp_remote_retrieve_body( $request );
-		$data = json_decode( $body, true );
-
-		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'kig_theme_checksum_json', __( 'Unexpected theme checksum response.', 'k-integrity-guard' ) );
-		}
-
-		if ( empty( $data['checksums'] ) || ! is_array( $data['checksums'] ) ) {
-			if ( isset( $data['error'] ) && is_string( $data['error'] ) ) {
-				return new WP_Error( 'kig_theme_checksum_error', $data['error'] );
-			}
-
-			return new WP_Error( 'kig_theme_checksum_missing', __( 'Theme checksums were not provided by WordPress.org.', 'k-integrity-guard' ) );
-		}
-
-		$type = isset( $data['checksum_type'] ) ? strtolower( (string) $data['checksum_type'] ) : 'md5';
-		if ( ! in_array( $type, array( 'md5', 'sha256' ), true ) ) {
-			$type = 'md5';
-		}
-
-		return array(
-			'checksums'      => $data['checksums'],
-			'checksum_type'  => $type,
-		);
-	}
-
-	/**
 	 * Normalize checksum map keys to relative paths.
 	 *
 	 * @param array<mixed> $checksums Raw checksum map.
@@ -1802,7 +1676,8 @@ class KIG_Scan {
 				}
 			}
 
-			$normalized[ $relative ] = (string) $hash;
+			// WordPress.org plugin checksums give {"md5": "<hash>" or ["<hash>", ...], "sha256": ...} per file.
+			$normalized[ $relative ] = is_array( $hash ) ? (array) ( $hash['md5'] ?? array() ) : (string) $hash;
 		}
 
 		return $normalized;
@@ -1825,9 +1700,11 @@ class KIG_Scan {
 		$added       = array();
 		$algorithm   = in_array( strtolower( $algorithm ), array( 'md5', 'sha256' ), true ) ? strtolower( $algorithm ) : 'md5';
 
-		foreach ( $checksums as $relative => $expected ) {
+		foreach ( $checksums as $relative => $valid ) {
 			$relative = ltrim( wp_normalize_path( (string) $relative ), '/' );
-			$expected = (string) $expected;
+			// One hash, or a list when several versions of a file are valid (WordPress.org plugin checksums).
+			$valid    = array_map( 'strtolower', array_map( 'strval', (array) $valid ) );
+			$expected = implode( ' / ', $valid );
 			$full     = $root . '/' . $relative;
 
 			if ( ! file_exists( $full ) ) {
@@ -1862,7 +1739,7 @@ class KIG_Scan {
 				continue;
 			}
 
-			if ( strtolower( $actual ) !== strtolower( $expected ) ) {
+			if ( ! in_array( strtolower( $actual ), $valid, true ) ) {
 				$modified[] = array(
 					'file'     => $relative,
 					'expected' => $expected,
@@ -1981,19 +1858,6 @@ class KIG_Scan {
 		}
 
 		return $clean;
-	}
-
-	/**
-	 * Determine the locale to request from the WordPress.org APIs.
-	 *
-	 * @return string
-	 */
-	private function determine_request_locale(): string {
-		if ( function_exists( 'determine_locale' ) ) {
-			return (string) determine_locale();
-		}
-
-		return (string) get_locale();
 	}
 
 	/**
@@ -2189,39 +2053,16 @@ class KIG_Scan {
 	 * @param string $path Relative path from ABSPATH.
 	 * @return bool
 	 */
-	private function is_core_path_excluded( string $path, array $allowed_theme_dirs = array() ): bool {
-		$normalized = ltrim( wp_normalize_path( $path ), '/' );
-		$normalized = untrailingslashit( $normalized );
+	private function is_core_path_excluded( string $path ): bool {
+		$normalized = untrailingslashit( ltrim( wp_normalize_path( $path ), '/' ) );
 
-		foreach ( self::CORE_EXCLUDED_FILES as $file ) {
-			if ( $normalized === $file ) {
-				if ( ! empty( $allowed_theme_dirs ) && $this->is_allowed_theme_path( $normalized, $allowed_theme_dirs ) ) {
-					continue;
-				}
-
-				return true;
-			}
+		if ( in_array( $normalized, self::CORE_EXCLUDED_FILES, true ) ) {
+			return true;
 		}
 
 		foreach ( self::CORE_EXCLUDED_PREFIXES as $prefix ) {
-			$prefix = trim( wp_normalize_path( $prefix ), '/' );
-			if ( '' === $prefix ) {
-				continue;
-			}
-
-			$prefix = untrailingslashit( $prefix );
-
-			if ( 0 === strpos( $normalized, $prefix ) ) {
-				if ( 'wp-content/themes' === $prefix && ! empty( $allowed_theme_dirs ) ) {
-					if ( $this->is_allowed_theme_path( $normalized, $allowed_theme_dirs ) ) {
-						continue;
-					}
-				}
-
-				$remainder = substr( $normalized, strlen( $prefix ) );
-				if ( '' === $remainder || '/' === $remainder[0] ) {
-					return true;
-				}
+			if ( $normalized === $prefix || 0 === strpos( $normalized, $prefix . '/' ) ) {
+				return true;
 			}
 		}
 
