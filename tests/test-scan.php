@@ -74,4 +74,82 @@ class Test_KIG_Scan extends WP_UnitTestCase {
 			$this->assertNotSame( 'wp-config.php', $file );
 		}
 	}
+
+	/** Writes a minimal theme into the theme root and returns its slug. */
+	private function make_theme( $version ) {
+		$slug = 'kig-bundled-test';
+		$dir  = get_theme_root() . '/' . $slug;
+		wp_mkdir_p( $dir );
+		file_put_contents( $dir . '/style.css', "/*\nTheme Name: KIG Bundled Test\nVersion: {$version}\n*/\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		wp_clean_themes_cache();
+		return $slug;
+	}
+
+	private function remove_theme( $slug ) {
+		KIG_Utils::delete_theme_checksum_file( $slug );
+		$dir = get_theme_root() . '/' . $slug;
+		array_map( 'unlink', glob( $dir . '/*' ) );
+		rmdir( $dir );
+		wp_clean_themes_cache();
+	}
+
+	/** A bundled theme with a snapshot is checked against the snapshot: accepted edits pass, later edits are flagged. */
+	public function test_bundled_theme_snapshot_replaces_core_check() {
+		$slug = $this->make_theme( '1.0' );
+		$dir  = 'wp-content/themes/' . $slug;
+		file_put_contents( get_theme_root() . "/$slug/style.css", "\n/* my edit */", FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		KIG_Utils::generate_theme_checksum_json( $slug );
+
+		$state    = array();
+		$filtered = array( 'wp-login.php' => 'a', "$dir/style.css" => 'original' );
+		$allowed  = array( 'wp-content/themes/index.php', $dir );
+		$this->call( 'apply_theme_snapshots', array( &$state, &$filtered, &$allowed ) );
+
+		$this->assertSame( array( 'wp-login.php' ), array_keys( $filtered ) );
+		$this->assertSame( array( 'wp-content/themes/index.php' ), $allowed );
+		$this->assertSame( array( $slug ), $state['snapshot_themes'] );
+
+		$state += array( 'modified' => array(), 'missing' => array(), 'added' => array(), 'errors' => array() );
+		$this->call( 'check_bundled_theme_snapshots', array( &$state ) );
+		$this->assertSame( array(), $state['modified'] );
+
+		file_put_contents( get_theme_root() . "/$slug/style.css", "\n/* later change */", FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$this->call( 'check_bundled_theme_snapshots', array( &$state ) );
+		$this->assertSame( array( "$dir/style.css" ), wp_list_pluck( $state['modified'], 'file' ) );
+
+		$this->remove_theme( $slug );
+	}
+
+	/** After an update the snapshot is outdated: the theme goes back to the WordPress original, with a note. */
+	public function test_outdated_bundled_theme_snapshot_falls_back_to_core() {
+		$slug = $this->make_theme( '1.0' );
+		KIG_Utils::generate_theme_checksum_json( $slug );
+		$this->make_theme( '2.0' );
+
+		$state    = array();
+		$filtered = array( "wp-content/themes/$slug/style.css" => 'original' );
+		$allowed  = array( "wp-content/themes/$slug" );
+		$this->call( 'apply_theme_snapshots', array( &$state, &$filtered, &$allowed ) );
+
+		$this->assertSame( array(), $state['snapshot_themes'] );
+		$this->assertSame( array( "wp-content/themes/$slug/style.css" ), array_keys( $filtered ) );
+		$this->assertCount( 1, $state['notes'] );
+
+		$this->remove_theme( $slug );
+	}
+
+	/** An edited bundled theme without a snapshot gets the child-theme hint once. */
+	public function test_edited_bundled_theme_gets_child_theme_note() {
+		$state = array(
+			'bundled_themes' => array( 'wp-content/themes/twentytwentyfour', 'wp-content/themes/twentytwentyfive' ),
+			'modified'       => array( array( 'file' => 'wp-content/themes/twentytwentyfour/style.css' ), array( 'file' => 'wp-content/themes/twentytwentyfour/theme.json' ) ),
+			'added'          => array( 'wp-includes/evil.php' ),
+			'notes'          => array(),
+		);
+		$this->call( 'note_edited_bundled_themes', array( &$state ) );
+
+		$this->assertCount( 1, $state['notes'] );
+		$this->assertStringContainsString( 'child theme', $state['notes'][0] );
+	}
 }
+

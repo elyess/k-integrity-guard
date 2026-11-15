@@ -42,7 +42,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<div class="wpig-third-party-section">
 		<h2><?php esc_html_e( 'Theme Snapshots', 'k-integrity-guard' ); ?></h2>
 		<p class="description">
-			<?php esc_html_e( 'WordPress.org does not publish theme checksums, so themes are verified against a snapshot. Generate one for each theme you want checked, or ignore it. Only the default themes that ship with your WordPress version are checked by the core scan; older default themes need a snapshot.', 'k-integrity-guard' ); ?>
+			<?php esc_html_e( 'WordPress.org does not publish theme checksums, so themes are verified against a snapshot. Generate one for each theme you want checked, or ignore it. Only the default themes that ship with your WordPress version are checked by the core scan; older default themes need a snapshot. If you edited a shipped default theme yourself, generate its snapshot: the core scan then accepts your edits and reports only later changes, until the theme is updated.', 'k-integrity-guard' ); ?>
 		</p>
 
 		<form method="post" action="options.php" id="wpig-third-party-themes-form">

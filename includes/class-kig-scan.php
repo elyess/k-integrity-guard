@@ -638,7 +638,10 @@ class KIG_Scan {
 
 		$allowed_theme_dirs = array();
 		$filtered           = $this->filter_core_checksums( $checksums['checksums'], $allowed_theme_dirs );
-		$files              = array_keys( $filtered );
+
+		$this->apply_theme_snapshots( $state, $filtered, $allowed_theme_dirs );
+
+		$files = array_keys( $filtered );
 
 		$state['files']     = $files;
 		$state['total']     = count( $files );
@@ -652,6 +655,51 @@ class KIG_Scan {
 		$state['actual_files'] = $this->list_core_files( $allowed_theme_dirs );
 
 		return true;
+	}
+
+	/**
+	 * Move bundled themes that have an up-to-date snapshot out of the core checksum check.
+	 *
+	 * A snapshot holds local edits the admin accepted, so these themes are checked against it in finalize_core_target().
+	 *
+	 * @param array<string,mixed>  $state              Core target state (passed by reference).
+	 * @param array<string,string> $filtered           Core checksums (passed by reference).
+	 * @param array<int,string>    $allowed_theme_dirs Bundled theme paths to walk (passed by reference).
+	 */
+	private function apply_theme_snapshots( array &$state, array &$filtered, array &$allowed_theme_dirs ): void {
+		$state['snapshot_themes'] = array();
+		$state['notes']           = array();
+		foreach ( $allowed_theme_dirs as $i => $dir ) {
+			$slug     = substr( $dir, strlen( 'wp-content/themes/' ) );
+			$snapshot = 'index.php' === $slug ? null : KIG_Utils::read_theme_checksum_json( $slug );
+			if ( null === $snapshot ) {
+				continue;
+			}
+
+			// An update replaced the theme (and the local edits): the snapshot is outdated, so use the WordPress original.
+			$theme = wp_get_theme( $slug );
+			if ( (string) ( $snapshot['version'] ?? '' ) !== (string) $theme->get( 'Version' ) ) {
+				$state['notes'][] = sprintf(
+					/* translators: 1: Theme name, 2: snapshot version, 3: installed version. */
+					__( '%1$s: the snapshot is for version %2$s but %3$s is installed, so it was checked against the WordPress original. Generate a new snapshot if you edit it again.', 'k-integrity-guard' ),
+					$theme->get( 'Name' ) ? $theme->get( 'Name' ) : $slug,
+					(string) ( $snapshot['version'] ?? '' ),
+					(string) $theme->get( 'Version' )
+				);
+				continue;
+			}
+
+			$state['snapshot_themes'][] = $slug;
+			unset( $allowed_theme_dirs[ $i ] );
+			foreach ( array_keys( $filtered ) as $path ) {
+				if ( 0 === strpos( $path, $dir . '/' ) ) {
+					unset( $filtered[ $path ] );
+				}
+			}
+		}
+
+		$allowed_theme_dirs      = array_values( $allowed_theme_dirs );
+		$state['bundled_themes'] = array_values( array_diff( $allowed_theme_dirs, array( 'wp-content/themes/index.php' ) ) );
 	}
 
 	/**
@@ -906,6 +954,9 @@ class KIG_Scan {
 			}
 		}
 
+		$this->check_bundled_theme_snapshots( $state );
+		$this->note_edited_bundled_themes( $state );
+
 		if ( ! empty( $state['missing'] ) ) {
 			$state['missing'] = array_values( array_unique( $state['missing'] ) );
 		}
@@ -916,7 +967,67 @@ class KIG_Scan {
 
 		$state['modified'] = array_values( $state['modified'] );
 
-		unset( $state['files'], $state['actual_files'], $state['pointer'] );
+		unset( $state['files'], $state['actual_files'], $state['pointer'], $state['snapshot_themes'], $state['bundled_themes'] );
+	}
+
+	/**
+	 * Check bundled themes that have a snapshot against that snapshot and merge the results into the core lists.
+	 *
+	 * @param array<string,mixed> $state Core target state (passed by reference).
+	 */
+	private function check_bundled_theme_snapshots( array &$state ): void {
+		foreach ( $state['snapshot_themes'] ?? array() as $slug ) {
+			$dir    = 'wp-content/themes/' . $slug;
+			$theme  = wp_get_theme( $slug );
+			$result = $this->compare_with_snapshot( KIG_Utils::read_theme_checksum_json( $slug ), $theme->get_stylesheet_directory(), (string) $theme->get( 'Version' ) );
+
+			if ( is_wp_error( $result ) ) {
+				$state['errors'][] = array(
+					'file'    => $dir,
+					'message' => $result->get_error_message(),
+				);
+				continue;
+			}
+
+			foreach ( $result['modified'] as $entry ) {
+				$entry['file']         = $dir . '/' . $entry['file'];
+				$state['modified'][] = $entry;
+			}
+			foreach ( array( 'missing', 'added' ) as $list ) {
+				foreach ( $result[ $list ] as $file ) {
+					$state[ $list ][] = $dir . '/' . $file;
+				}
+			}
+			foreach ( $result['errors'] as $entry ) {
+				$entry['file']       = $dir . '/' . $entry['file'];
+				$state['errors'][] = $entry;
+			}
+		}
+	}
+
+	/**
+	 * Explain edited bundled themes, since beginners often edit them instead of using a child theme.
+	 *
+	 * @param array<string,mixed> $state Core target state (passed by reference).
+	 */
+	private function note_edited_bundled_themes( array &$state ): void {
+		$changed = array_merge( wp_list_pluck( $state['modified'] ?? array(), 'file' ), $state['added'] ?? array() );
+
+		foreach ( $state['bundled_themes'] ?? array() as $dir ) {
+			$slug = substr( $dir, strlen( 'wp-content/themes/' ) );
+			$name = wp_get_theme( $slug )->get( 'Name' );
+
+			foreach ( $changed as $file ) {
+				if ( 0 === strpos( $file, $dir . '/' ) ) {
+					$state['notes'][] = sprintf(
+						/* translators: %s: Theme name. */
+						__( '%s: files differ from the WordPress original. Edits to a default theme are lost when it updates; use a child theme instead. If the changes are yours, generate a snapshot for this theme in Settings so only later changes are reported.', 'k-integrity-guard' ),
+						$name ? $name : $slug
+					);
+					break;
+				}
+			}
+		}
 	}
 
 	/**
@@ -931,16 +1042,18 @@ class KIG_Scan {
 		$added    = count( $state['added'] ?? array() );
 
 		if ( 0 === $modified && 0 === $missing && 0 === $added ) {
-			return __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
+			$message = __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
+		} else {
+			$message = sprintf(
+				/* translators: 1: modified count, 2: missing count, 3: added count. */
+				__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
+				$modified,
+				$missing,
+				$added
+			);
 		}
 
-		return sprintf(
-			/* translators: 1: modified count, 2: missing count, 3: added count. */
-			__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
-			$modified,
-			$missing,
-			$added
-		);
+		return implode( ' ', array_merge( array( $message ), $state['notes'] ?? array() ) );
 	}
 
 	/**
