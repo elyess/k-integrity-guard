@@ -30,4 +30,13 @@ class Test_KIG_DB extends WP_UnitTestCase {
 		$this->assertSame( 2, KIG_DB::delete_scans( array( $a, $b ) ) );
 		$this->assertSame( 0, KIG_DB::get_scans()['total'] );
 	}
+
+	public function test_delete_all_scans_returns_row_count() {
+		KIG_DB::insert_scan( array( 'summary' => 'one' ) );
+		KIG_DB::insert_scan( array( 'summary' => 'two' ) );
+		KIG_DB::insert_scan( array( 'summary' => 'three' ) );
+
+		$this->assertSame( 3, KIG_DB::delete_all_scans() );
+		$this->assertSame( 0, KIG_DB::get_scans()['total'] );
+	}
 }

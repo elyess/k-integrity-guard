@@ -1559,19 +1559,25 @@ class KIG_Scan {
 	}
 
 	/**
+	 * Core checksums for the installed WordPress version (cached for a day by fetch_core_checksums()).
+	 *
+	 * @return array<string,string> Empty when they are unavailable.
+	 */
+	private function core_checksums(): array {
+		$locale    = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+		$checksums = $this->fetch_core_checksums( get_bloginfo( 'version' ), $locale );
+
+		return is_wp_error( $checksums ) ? array() : $checksums['checksums'];
+	}
+
+	/**
 	 * Slugs of the default themes that ship with the installed WordPress version (from the cached core checksums).
 	 *
 	 * @return array<int,string> Empty when the core checksums are unavailable.
 	 */
 	private function bundled_theme_slugs(): array {
-		$locale    = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
-		$checksums = $this->fetch_core_checksums( get_bloginfo( 'version' ), $locale );
-		if ( is_wp_error( $checksums ) ) {
-			return array();
-		}
-
 		$slugs = array();
-		foreach ( array_keys( $checksums['checksums'] ) as $path ) {
+		foreach ( array_keys( $this->core_checksums() ) as $path ) {
 			$dir = $this->resolve_core_theme_directory( (string) $path );
 			if ( null !== $dir ) {
 				$slugs[ substr( $dir, strlen( 'wp-content/themes/' ) ) ] = true;
@@ -1636,6 +1642,18 @@ class KIG_Scan {
 		}
 
 		$map = $this->normalize_checksum_map( $checksums['checksums'], $prefixes );
+
+		// A single-file plugin (e.g. Hello Dolly) is installed without its readme: check only its own file.
+		// WordPress ships its own copy of some of these, so the core checksum for that file is valid too.
+		if ( '.' === $directory || '' === $directory ) {
+			$file = basename( $item['key'] );
+			$map  = array_intersect_key( $map, array( $file => true ) );
+			$core = $this->core_checksums()[ 'wp-content/plugins/' . $file ] ?? null;
+			if ( isset( $map[ $file ] ) && null !== $core ) {
+				$map[ $file ] = array_merge( (array) $map[ $file ], array( (string) $core ) );
+			}
+		}
+
 		if ( empty( $map ) ) {
 			return new WP_Error( 'kig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', 'k-integrity-guard' ) );
 		}

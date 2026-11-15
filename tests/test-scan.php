@@ -194,5 +194,36 @@ class Test_KIG_Scan extends WP_UnitTestCase {
 		$this->assertCount( 1, $state['notes'] );
 		$this->assertStringContainsString( 'child theme', $state['notes'][0] );
 	}
+
+	/** Hello Dolly case: a single-file plugin is checked only by its own file, and the copy WordPress ships is valid. */
+	public function test_single_file_wporg_plugin_accepts_core_copy_and_ignores_readme() {
+		$file = WP_PLUGIN_DIR . '/kig-single.php';
+		file_put_contents( $file, '<?php // shipped with core' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		$locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+		set_transient(
+			'kig_core_checksums_' . md5( get_bloginfo( 'version' ) . '|' . $locale ),
+			array( 'checksums' => array( 'wp-content/plugins/kig-single.php' => md5_file( $file ) ), 'locale' => $locale ),
+			DAY_IN_SECONDS
+		);
+		$fake = static function () {
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array( 'files' => array(
+					'kig-single.php' => array( 'md5' => md5( 'the wordpress.org version' ) ),
+					'readme.txt'     => array( 'md5' => md5( 'readme' ) ),
+				) ) ),
+			);
+		};
+		add_filter( 'pre_http_request', $fake );
+
+		$result = $this->call( 'verify_wporg_plugin', array( array( 'key' => 'kig-single.php', 'slug' => 'kig-single', 'version' => '1.0' ) ) );
+
+		remove_filter( 'pre_http_request', $fake );
+		unlink( $file );
+
+		$this->assertSame( array(), $result['modified'] );
+		$this->assertSame( array(), $result['missing'] );
+	}
 }
 

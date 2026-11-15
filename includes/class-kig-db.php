@@ -365,15 +365,17 @@ class KIG_DB {
 	public static function delete_all_scans() {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
-		$result     = $wpdb->query( "TRUNCATE TABLE " . esc_sql( $table_name ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$table_name = esc_sql( self::get_table_name() );
+		// TRUNCATE returns true, not a row count, so count first for the "N scans deleted" message.
+		$count  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->query( "TRUNCATE TABLE {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
 			self::increment_last_changed();
 		}
 
-		return false !== $result ? (int) $result : 0;
+		return false !== $result ? $count : 0;
 	}
 
 	/**
