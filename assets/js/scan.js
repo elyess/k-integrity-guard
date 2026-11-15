@@ -158,8 +158,14 @@
 		summaryArea.show();
 
 		var core = results && results.core ? results.core : null;
-		var plugins = results && results.plugins ? results.plugins : null;
-		var themes = results && results.themes ? results.themes : null;
+		var extensionTargets = [
+			{ key: 'plugins', heading: settings.text.pluginsHeading || 'Plugins' },
+			{ key: 'themes', heading: settings.text.themesHeading || 'Themes' },
+			{ key: 'third_party_plugins', heading: settings.text.thirdPartyPluginsHeading || 'Third-Party Plugins' },
+			{ key: 'third_party_themes', heading: settings.text.thirdPartyThemesHeading || 'Third-Party Themes' }
+		].filter( function ( target ) {
+			return results && results[ target.key ];
+		} );
 		var hasIssues = false;
 		var hasErrors = false;
 
@@ -178,9 +184,10 @@
 			}
 		}
 
-		if ( plugins ) {
-			if ( isArray( plugins.items ) ) {
-				plugins.items.forEach( function ( item ) {
+		extensionTargets.forEach( function ( target ) {
+			var data = results[ target.key ];
+			if ( isArray( data.items ) ) {
+				data.items.forEach( function ( item ) {
 					if ( item && item.status === 'issues' ) {
 						hasIssues = true;
 					}
@@ -189,26 +196,10 @@
 					}
 				} );
 			}
-			if ( isArray( plugins.errors ) && plugins.errors.length ) {
+			if ( isArray( data.errors ) && data.errors.length ) {
 				hasErrors = true;
 			}
-		}
-
-		if ( themes ) {
-			if ( isArray( themes.items ) ) {
-				themes.items.forEach( function ( item ) {
-					if ( item && item.status === 'issues' ) {
-						hasIssues = true;
-					}
-					if ( item && ( item.status === 'error' || ( isArray( item.errors ) && item.errors.length ) ) ) {
-						hasErrors = true;
-					}
-				} );
-			}
-			if ( isArray( themes.errors ) && themes.errors.length ) {
-				hasErrors = true;
-			}
-		}
+		} );
 
 		var noticeClass = 'notice notice-success';
 		if ( hasErrors ) {
@@ -225,13 +216,9 @@
 			renderCoreSection( core );
 		}
 
-		if ( plugins ) {
-			renderTargetSection( settings.text.pluginsHeading || 'Plugins', plugins );
-		}
-
-		if ( themes ) {
-			renderTargetSection( settings.text.themesHeading || 'Themes', themes );
-		}
+		extensionTargets.forEach( function ( target ) {
+			renderTargetSection( target.heading, results[ target.key ] );
+		} );
 
 		if ( ! hasIssues && ! hasErrors ) {
 			summaryArea.append( $( '<p />' ).text( settings.text.noIssues ) );
