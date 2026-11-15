@@ -351,7 +351,7 @@ class KIG_DB {
 
 		$placeholders = implode( ',', array_fill( 0, count( $scan_ids ), '%d' ) );
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One %d placeholder per ID.
-		$result       = $wpdb->query( $wpdb->prepare( "DELETE FROM " . esc_sql( self::get_table_name() ) . " WHERE id IN ({$placeholders})", ...$scan_ids ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$result       = $wpdb->query( $wpdb->prepare( "DELETE FROM " . esc_sql( self::get_table_name() ) . " WHERE id IN ({$placeholders})", ...$scan_ids ) );
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
