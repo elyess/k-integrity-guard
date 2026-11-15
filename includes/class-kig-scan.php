@@ -1596,14 +1596,24 @@ class KIG_Scan {
 	 * @return array<string,mixed>|WP_Error Comparison result.
 	 */
 	private function verify_third_party_plugin( array $item ) {
-		$base = dirname( $item['key'] );
-		$root = ( '.' === $base || '' === $base ) ? WP_PLUGIN_DIR : trailingslashit( WP_PLUGIN_DIR ) . $base;
+		$base     = dirname( $item['key'] );
+		$snapshot = KIG_Utils::read_plugin_checksum_json( $item['key'] );
 
+		if ( '.' === $base || '' === $base ) {
+			// Single-file plugin: check only its own file. Older snapshots hashed the whole plugins folder, so filter them too.
+			if ( is_array( $snapshot ) && is_array( $snapshot['files'] ?? null ) ) {
+				$snapshot['files'] = array_intersect_key( $snapshot['files'], array( $item['key'] => true ) );
+			}
+
+			return $this->compare_with_snapshot( $snapshot, WP_PLUGIN_DIR, $item['version'], false );
+		}
+
+		$root = trailingslashit( WP_PLUGIN_DIR ) . $base;
 		if ( ! is_dir( $root ) ) {
 			return new WP_Error( 'kig_plugin_path', __( 'Plugin directory could not be located.', 'k-integrity-guard' ) );
 		}
 
-		return $this->compare_with_snapshot( KIG_Utils::read_plugin_checksum_json( $item['key'] ), $root, $item['version'] );
+		return $this->compare_with_snapshot( $snapshot, $root, $item['version'] );
 	}
 
 	/**
@@ -1629,14 +1639,15 @@ class KIG_Scan {
 	 * @param array<string,mixed>|null $snapshot Snapshot data (version, algorithm, files).
 	 * @param string                   $root     Directory to compare.
 	 * @param string                   $version  Installed version.
+	 * @param bool                     $detect_added Whether to report files not in the snapshot.
 	 * @return array<string,mixed>|WP_Error Comparison result, with a 'note' when the version changed.
 	 */
-	private function compare_with_snapshot( $snapshot, string $root, string $version ) {
+	private function compare_with_snapshot( $snapshot, string $root, string $version, bool $detect_added = true ) {
 		if ( ! is_array( $snapshot ) || empty( $snapshot['files'] ) || ! is_array( $snapshot['files'] ) ) {
 			return new WP_Error( 'kig_no_checksum', __( 'No checksum snapshot available.', 'k-integrity-guard' ) );
 		}
 
-		$result           = $this->compare_extension_files( $root, $snapshot['files'], (string) ( $snapshot['algorithm'] ?? 'md5' ), true );
+		$result           = $this->compare_extension_files( $root, $snapshot['files'], (string) ( $snapshot['algorithm'] ?? 'md5' ), $detect_added );
 		$snapshot_version = (string) ( $snapshot['version'] ?? '' );
 
 		if ( $snapshot_version !== $version ) {
@@ -2132,6 +2143,8 @@ class KIG_Scan {
 	 * List installed core files for unexpected-file detection.
 	 *
 	 * Walks only root-level files of ABSPATH, wp-admin/, wp-includes/ and the allowed bundled theme folders.
+	 * In the root only PHP-type files are listed: sites keep their own .htaccess, robots.txt, favicon etc. there,
+	 * and only executable files are a tampering risk.
 	 *
 	 * @param array<int,string> $allowed_theme_dirs Allowed bundled theme paths relative to ABSPATH.
 	 * @return array<int,string>
@@ -2141,7 +2154,7 @@ class KIG_Scan {
 		$root  = wp_normalize_path( trailingslashit( ABSPATH ) );
 
 		foreach ( new DirectoryIterator( $root ) as $entry ) {
-			if ( $entry->isFile() && ! $this->is_core_path_excluded( $entry->getFilename() ) ) {
+			if ( $entry->isFile() && self::is_executable_name( $entry->getFilename() ) && ! $this->is_core_path_excluded( $entry->getFilename() ) ) {
 				$files[] = $entry->getFilename();
 			}
 		}
@@ -2158,6 +2171,16 @@ class KIG_Scan {
 		}
 
 		return $files;
+	}
+
+	/**
+	 * Whether a file name is one PHP may execute (.php, .php7, .phtml, .phar ...).
+	 *
+	 * @param string $name File name.
+	 * @return bool
+	 */
+	private static function is_executable_name( string $name ): bool {
+		return 1 === preg_match( '/\.(php\d*|phtml|phar|phps)$/i', $name );
 	}
 
 	/**

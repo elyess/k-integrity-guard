@@ -238,7 +238,10 @@ class KIG_Utils {
 		}
 
 		$algo = 'sha256';
-		$map  = self::hash_directory( WP_PLUGIN_DIR . '/' . dirname( $plugin_file ), $algo );
+		// A single-file plugin (e.g. hello.php) has no folder of its own: hash only that file.
+		$map  = '.' === dirname( $plugin_file )
+			? array( $plugin_file => hash_file( $algo, WP_PLUGIN_DIR . '/' . $plugin_file ) )
+			: self::hash_directory( WP_PLUGIN_DIR . '/' . dirname( $plugin_file ), $algo );
 
 		$payload = array(
 			'plugin_file'  => $plugin_file,
