@@ -204,24 +204,24 @@ class KIG_Settings {
 
         // Enqueue CSS.
         wp_enqueue_style(
-            'wpig-settings',
+            'kig-settings',
             $css_url,
             array(),
-            '1.0.0'
+            K_Integrity_Guard::VERSION
         );
 
         // Enqueue JavaScript.
         wp_enqueue_script(
-            'wpig-settings',
+            'kig-settings',
             $script_url,
             array( 'jquery' ),
-            '1.0.0',
+            K_Integrity_Guard::VERSION,
             true
         );
 
         wp_localize_script(
-            'wpig-settings',
-            'wpigSettings',
+            'kig-settings',
+            'kigSettings',
             array(
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'nonce'   => wp_create_nonce( 'kig_generate_checksum' ),
@@ -260,15 +260,13 @@ class KIG_Settings {
             $name    = '' !== $plugin['name'] ? $plugin['name'] : $file;
             $version = '' !== $plugin['version'] ? $plugin['version'] : __( 'Unknown', 'k-integrity-guard' );
 
-            $status_text = KIG_Utils::checksum_is_stale( $file )
-                ? __( 'Needs update', 'k-integrity-guard' )
-                : __( 'Up to date', 'k-integrity-guard' );
+            $status_text = self::snapshot_status( null !== KIG_Utils::read_plugin_checksum_json( $file ), KIG_Utils::checksum_is_stale( $file ) );
 
             $items[] = array(
                 'name'    => esc_html( $name ),
                 'version' => esc_html( $version ),
                 'status'  => sprintf(
-                    '<span class="wpig-status" data-plugin="%1$s">%2$s</span>',
+                    '<span class="kig-status" data-plugin="%1$s">%2$s</span>',
                     esc_attr( $file ),
                     esc_html( $status_text )
                 ),
@@ -280,7 +278,7 @@ class KIG_Settings {
                     esc_html__( 'Ignore', 'k-integrity-guard' )
                 ),
                 'action'  => sprintf(
-                    '<button type="button" class="button wpig-generate" data-plugin="%1$s">%2$s</button> <span class="spinner" style="float:none;"></span>',
+                    '<button type="button" class="button kig-generate" data-plugin="%1$s">%2$s</button> <span class="spinner" style="float:none;"></span>',
                     esc_attr( $file ),
                     esc_html__( 'Update Checksum', 'k-integrity-guard' )
                 ),
@@ -319,15 +317,13 @@ class KIG_Settings {
             $name    = '' !== $theme['name'] ? $theme['name'] : $stylesheet;
             $version = '' !== $theme['version'] ? $theme['version'] : __( 'Unknown', 'k-integrity-guard' );
 
-            $status_text = KIG_Utils::theme_checksum_is_stale( $stylesheet )
-                ? __( 'Needs update', 'k-integrity-guard' )
-                : __( 'Up to date', 'k-integrity-guard' );
+            $status_text = self::snapshot_status( null !== KIG_Utils::read_theme_checksum_json( $stylesheet ), KIG_Utils::theme_checksum_is_stale( $stylesheet ) );
 
             $items[] = array(
                 'name'    => esc_html( $name ),
                 'version' => esc_html( $version ),
                 'status'  => sprintf(
-                    '<span class="wpig-theme-status" data-theme="%1$s">%2$s</span>',
+                    '<span class="kig-theme-status" data-theme="%1$s">%2$s</span>',
                     esc_attr( $stylesheet ),
                     esc_html( $status_text )
                 ),
@@ -339,7 +335,7 @@ class KIG_Settings {
                     esc_html__( 'Ignore', 'k-integrity-guard' )
                 ),
                 'action'  => sprintf(
-                    '<button type="button" class="button wpig-theme-generate" data-theme="%1$s">%2$s</button> <span class="spinner" style="float:none;"></span>',
+                    '<button type="button" class="button kig-theme-generate" data-theme="%1$s">%2$s</button> <span class="spinner" style="float:none;"></span>',
                     esc_attr( $stylesheet ),
                     esc_html__( 'Update Checksum', 'k-integrity-guard' )
                 ),
@@ -353,6 +349,21 @@ class KIG_Settings {
         );
         $table->prepare_items();
         $table->display();
+    }
+
+    /**
+     * Label for a snapshot's state in the settings tables.
+     *
+     * @param bool $exists Whether a snapshot file exists.
+     * @param bool $stale  Whether it is missing or made for another version.
+     * @return string
+     */
+    private static function snapshot_status( $exists, $stale ) {
+        if ( ! $exists ) {
+            return __( 'No snapshot', 'k-integrity-guard' );
+        }
+
+        return $stale ? __( 'Outdated', 'k-integrity-guard' ) : __( 'Up to date', 'k-integrity-guard' );
     }
 
     /** AJAX handler: Generate checksum JSON for a plugin */

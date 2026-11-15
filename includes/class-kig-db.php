@@ -128,6 +128,7 @@ class KIG_DB {
 			'created_by'   => absint( $data['created_by'] ),
 		);
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$result = $wpdb->insert(
 			self::get_table_name(),
 			$insert_data,
@@ -218,6 +219,8 @@ class KIG_DB {
 
 		$where_clause = implode( ' AND ', $where );
 
+		// The WHERE clause only joins fixed "column = %s" strings; every value goes through prepare().
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		// Get total count.
 		if ( ! empty( $query_args ) ) {
 			$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}", $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -236,6 +239,7 @@ class KIG_DB {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable
 
 		// Decode JSON fields.
 		if ( ! empty( $items ) ) {
@@ -275,6 +279,7 @@ class KIG_DB {
 		}
 
 		$table_name = self::get_table_name();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$scan       = $wpdb->get_row(
 			$wpdb->prepare( "SELECT * FROM " . esc_sql( $table_name ) . " WHERE id = %d", $scan_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			ARRAY_A
@@ -307,6 +312,7 @@ class KIG_DB {
 			return false;
 		}
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$result = $wpdb->delete(
 			self::get_table_name(),
 			array( 'id' => $scan_id ),
@@ -344,6 +350,7 @@ class KIG_DB {
 		}
 
 		$placeholders = implode( ',', array_fill( 0, count( $scan_ids ), '%d' ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One %d placeholder per ID.
 		$result       = $wpdb->query( $wpdb->prepare( "DELETE FROM " . esc_sql( self::get_table_name() ) . " WHERE id IN ({$placeholders})", ...$scan_ids ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
@@ -392,6 +399,7 @@ class KIG_DB {
 		// scan_date is stored in site-local time (current_time( 'mysql' )), so compare in site time.
 		$date       = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - $days * DAY_IN_SECONDS ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM " . esc_sql( $table_name ) . " WHERE scan_date < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -422,6 +430,7 @@ class KIG_DB {
 		global $wpdb;
 		$table_name = self::get_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$results = $wpdb->get_results(
 			"SELECT status, COUNT(*) as count FROM " . esc_sql( $table_name ) . " GROUP BY status", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			ARRAY_A

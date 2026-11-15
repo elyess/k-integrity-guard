@@ -101,7 +101,7 @@ class KIG_Scan {
 			return;
 		}
 
-		$handle = 'wpig-scan';
+		$handle = 'kig-scan';
 		$src    = plugin_dir_url( $this->plugin_file ) . 'assets/js/scan.js';
 
 		wp_enqueue_script( $handle, $src, array( 'jquery' ), $this->version, true );
@@ -110,7 +110,7 @@ class KIG_Scan {
 
 		wp_localize_script(
 			$handle,
-			'wpigScan',
+			'kigScan',
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonces'  => array(

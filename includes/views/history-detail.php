@@ -24,7 +24,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 		</a>
 	</p>
 
-	<div class="wpig-scan-detail">
+	<div class="kig-scan-detail">
 		<table class="widefat fixed striped">
 			<tbody>
 				<tr>
@@ -36,9 +36,9 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 					<td>
 						<?php
 						if ( 'cron' === $scan['context'] ) {
-							echo '<span class="wpig-context-badge wpig-context-cron">' . esc_html__( 'Scheduled', 'k-integrity-guard' ) . '</span>';
+							echo '<span class="kig-context-badge kig-context-cron">' . esc_html__( 'Scheduled', 'k-integrity-guard' ) . '</span>';
 						} else {
-							echo '<span class="wpig-context-badge wpig-context-manual">' . esc_html__( 'Manual', 'k-integrity-guard' ) . '</span>';
+							echo '<span class="kig-context-badge kig-context-manual">' . esc_html__( 'Manual', 'k-integrity-guard' ) . '</span>';
 						}
 						?>
 					</td>
@@ -49,13 +49,13 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 						<?php
 						switch ( $scan['status'] ) {
 							case 'success':
-								echo '<span class="wpig-status-badge wpig-status-success">' . esc_html__( 'Success', 'k-integrity-guard' ) . '</span>';
+								echo '<span class="kig-status-badge kig-status-success">' . esc_html__( 'Success', 'k-integrity-guard' ) . '</span>';
 								break;
 							case 'warning':
-								echo '<span class="wpig-status-badge wpig-status-warning">' . esc_html__( 'Warning', 'k-integrity-guard' ) . '</span>';
+								echo '<span class="kig-status-badge kig-status-warning">' . esc_html__( 'Warning', 'k-integrity-guard' ) . '</span>';
 								break;
 							case 'error':
-								echo '<span class="wpig-status-badge wpig-status-error">' . esc_html__( 'Error', 'k-integrity-guard' ) . '</span>';
+								echo '<span class="kig-status-badge kig-status-error">' . esc_html__( 'Error', 'k-integrity-guard' ) . '</span>';
 								break;
 						}
 						?>
@@ -96,6 +96,12 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 					case 'themes':
 						esc_html_e( 'Themes', 'k-integrity-guard' );
 						break;
+					case 'third_party_plugins':
+						esc_html_e( 'Third-Party Plugins', 'k-integrity-guard' );
+						break;
+					case 'third_party_themes':
+						esc_html_e( 'Third-Party Themes', 'k-integrity-guard' );
+						break;
 					default:
 						echo esc_html( ucfirst( $target ) );
 				}
@@ -112,7 +118,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 						continue;
 					} ?>
 
-					<div class="wpig-item-detail" style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+					<div class="kig-item-detail" style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
 						<h4 style="margin-top: 0;">
 							<?php echo esc_html( $item['name'] ?? __( 'Unknown', 'k-integrity-guard' ) ); ?>
 							<?php if ( isset( $item['version'] ) ) : ?>
@@ -120,7 +126,7 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 							<?php endif; ?>
 						</h4>
 
-						<?php if ( isset( $item['message'] ) ) : ?>
+						<?php if ( ! empty( $item['message'] ) && $item['message'] !== ( $result['summary'] ?? '' ) ) : ?>
 							<p><strong><?php echo esc_html( $item['message'] ); ?></strong></p>
 						<?php endif; ?>
 
@@ -194,37 +200,37 @@ $targets   = is_array( $scan['targets'] ) ? $scan['targets'] : array();
 </div>
 
 <style>
-.wpig-status-badge {
+.kig-status-badge {
 	display: inline-block;
 	padding: 3px 8px;
 	border-radius: 3px;
 	font-size: 12px;
 	font-weight: 600;
 }
-.wpig-status-success {
+.kig-status-success {
 	background-color: #d4edda;
 	color: #155724;
 }
-.wpig-status-warning {
+.kig-status-warning {
 	background-color: #fff3cd;
 	color: #856404;
 }
-.wpig-status-error {
+.kig-status-error {
 	background-color: #f8d7da;
 	color: #721c24;
 }
 
-.wpig-context-badge {
+.kig-context-badge {
 	display: inline-block;
 	padding: 3px 8px;
 	border-radius: 3px;
 	font-size: 12px;
 }
-.wpig-context-manual {
+.kig-context-manual {
 	background-color: #cfe2ff;
 	color: #084298;
 }
-.wpig-context-cron {
+.kig-context-cron {
 	background-color: #e7e9ee;
 	color: #41464b;
 }

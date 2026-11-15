@@ -1,0 +1,12 @@
+# Used by `wp dist-archive` and deploy tools; keep in sync with .gitattributes.
+/.git
+/.wordpress-org
+/tests
+/bin
+/phpunit.xml.dist
+/README.md
+/CLAUDE.md
+/.gitignore
+/.gitattributes
+/.distignore
+.DS_Store

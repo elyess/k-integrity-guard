@@ -1,14 +1,16 @@
 <?php
 /**
- * Plugin Name: K'Integrity Guard
- * Description: Monitors and protects your WordPress core files, themes, and plugins from unauthorized changes.
- * Version: 1.1.0
- * Author: Elyes Zouaghi
- * Author URI: https://github.com/elyess/k-integrity-guard
- * License: GPL-2.0+
- * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain: k-integrity-guard
- * Domain Path: /languages
+ * Plugin Name:       K'Integrity Guard
+ * Plugin URI:        https://github.com/elyess/k-integrity-guard
+ * Description:       Detects unexpected changes to WordPress core, plugin and theme files by comparing them with official WordPress.org checksums or your own snapshots.
+ * Version:           1.2.0
+ * Requires at least: 6.0
+ * Requires PHP:      7.4
+ * Author:            Elyes Zouaghi
+ * Author URI:        https://github.com/elyess
+ * License:           GPLv2 or later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       k-integrity-guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -23,7 +25,7 @@ require_once __DIR__ . '/includes/class-kig-history-table.php';
 
 class K_Integrity_Guard {
 
-	const VERSION = '1.1.0';
+	const VERSION = '1.2.0';
 
 
 	const CAPABILITY = 'manage_options';
@@ -135,6 +137,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
 		$redirect = admin_url('admin.php?page=' . self::SLUG_HISTORY);
 
 		// Single delete.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce is verified by check_admin_referer() below before anything is deleted.
 		if (isset($_GET['action'], $_GET['scan_id']) && 'delete' === sanitize_key($_GET['action'])) {
 			$scan_id = absint($_GET['scan_id']);
 			check_admin_referer('delete_scan_' . $scan_id);
@@ -244,6 +247,7 @@ private function is_network_active() {
     if ($this->get_global_notice_flag() !== 'yes') return;
 
     // Skip on the scan page itself
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only compares the current admin page slug to hide the notice.
     if (isset($_GET['page']) && sanitize_key($_GET['page']) === self::SLUG_SCAN) return;
 
     $scan_url     = add_query_arg(['page' => self::SLUG_SCAN, 'run_first_scan' => 1], admin_url('admin.php'));
