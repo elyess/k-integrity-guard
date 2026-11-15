@@ -22,14 +22,8 @@ class KIG_DB {
 	/**
 	 * Option name for storing database version.
 	 */
-	/**
-	 * Option name for storing database version.
-	 */
 	const DB_VERSION_OPTION = 'kig_db_version';
 
-	/**
-	 * Cache group for scan counts.
-	 */
 	/**
 	 * Cache group for scan counts.
 	 */
@@ -237,7 +231,8 @@ class KIG_DB {
 
 		$items = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
+				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
+				...$query_args
 			),
 			ARRAY_A
 		);
@@ -348,8 +343,8 @@ class KIG_DB {
 			return 0;
 		}
 
-		$ids_string = implode( ',', $scan_ids );
-		$result     = $wpdb->query( "DELETE FROM {$table_name} WHERE id IN ({$ids_string})" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$placeholders = implode( ',', array_fill( 0, count( $scan_ids ), '%d' ) );
+		$result       = $wpdb->query( $wpdb->prepare( "DELETE FROM " . esc_sql( self::get_table_name() ) . " WHERE id IN ({$placeholders})", ...$scan_ids ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
@@ -392,7 +387,8 @@ class KIG_DB {
 
 		$days       = absint( $days );
 		$table_name = self::get_table_name();
-		$date       = gmdate( 'Y-m-d H:i:s', strtotime( "-{$days} days" ) );
+		// scan_date is stored in site-local time (current_time( 'mysql' )), so compare in site time.
+		$date       = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - $days * DAY_IN_SECONDS ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
 
 		$result = $wpdb->query(
 			$wpdb->prepare(
