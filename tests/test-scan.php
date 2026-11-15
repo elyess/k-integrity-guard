@@ -25,6 +25,10 @@ class Test_KIG_Scan extends WP_UnitTestCase {
 	public function tear_down() {
 		array_map( 'unlink', glob( $this->dir . '/*' ) );
 		rmdir( $this->dir );
+		// Runs even when an assertion failed, so no test theme is left in the theme root.
+		if ( is_dir( get_theme_root() . '/kig-bundled-test' ) ) {
+			$this->remove_theme( 'kig-bundled-test' );
+		}
 		parent::tear_down();
 	}
 
@@ -116,8 +120,49 @@ class Test_KIG_Scan extends WP_UnitTestCase {
 		file_put_contents( get_theme_root() . "/$slug/style.css", "\n/* later change */", FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		$this->call( 'check_bundled_theme_snapshots', array( &$state ) );
 		$this->assertSame( array( "$dir/style.css" ), wp_list_pluck( $state['modified'], 'file' ) );
+	}
 
-		$this->remove_theme( $slug );
+	/** Files the snapshot accepts but that differ from the WordPress original are always named in a note. */
+	public function test_snapshot_accepted_edits_are_reported_in_a_note() {
+		$slug = $this->make_theme( '1.0' );
+		$dir  = 'wp-content/themes/' . $slug;
+		$root = get_theme_root() . '/' . $slug;
+		$original = md5_file( $root . '/style.css' );
+		file_put_contents( $root . '/style.css', "\n/* my edit */", FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		file_put_contents( $root . '/extra.php', '<?php // my file' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		KIG_Utils::generate_theme_checksum_json( $slug );
+
+		$state    = array();
+		$filtered = array( "$dir/style.css" => $original );
+		$allowed  = array( $dir );
+		$this->call( 'apply_theme_snapshots', array( &$state, &$filtered, &$allowed ) );
+		$state += array( 'modified' => array(), 'missing' => array(), 'added' => array(), 'errors' => array() );
+		$this->call( 'check_bundled_theme_snapshots', array( &$state ) );
+
+		$this->assertSame( array(), $state['modified'] );
+		$this->assertSame( array(), $state['added'] );
+		$this->assertCount( 1, $state['notes'] );
+		$this->assertStringContainsString( '2 file(s) differ from the WordPress original', $state['notes'][0] );
+	}
+
+	/** The bundled theme list comes from the cached core checksums. */
+	public function test_bundled_theme_slugs_from_core_checksums() {
+		$locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+		set_transient(
+			'kig_core_checksums_' . md5( get_bloginfo( 'version' ) . '|' . $locale ),
+			array(
+				'checksums' => array(
+					'wp-login.php'                               => 'a',
+					'wp-content/themes/index.php'                => 'b',
+					'wp-content/themes/twentytwentyfive/style.css' => 'c',
+					'wp-content/themes/twentytwentyfive/theme.json' => 'd',
+				),
+				'locale'    => $locale,
+			),
+			DAY_IN_SECONDS
+		);
+
+		$this->assertSame( array( 'twentytwentyfive' ), $this->call( 'bundled_theme_slugs', array() ) );
 	}
 
 	/** After an update the snapshot is outdated: the theme goes back to the WordPress original, with a note. */
@@ -134,8 +179,6 @@ class Test_KIG_Scan extends WP_UnitTestCase {
 		$this->assertSame( array(), $state['snapshot_themes'] );
 		$this->assertSame( array( "wp-content/themes/$slug/style.css" ), array_keys( $filtered ) );
 		$this->assertCount( 1, $state['notes'] );
-
-		$this->remove_theme( $slug );
 	}
 
 	/** An edited bundled theme without a snapshot gets the child-theme hint once. */

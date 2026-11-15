@@ -375,6 +375,11 @@ class KIG_Scan {
 			);
 		}
 
+		// The core scan covers the bundled default themes; the themes target must not check them a second time.
+		if ( isset( $target_states['core'], $target_states['themes'] ) ) {
+			$target_states['themes']['core_covers_bundled'] = true;
+		}
+
 		return array(
 			'context'        => $context,
 			'targets'        => array_values( $targets ),
@@ -691,8 +696,11 @@ class KIG_Scan {
 
 			$state['snapshot_themes'][] = $slug;
 			unset( $allowed_theme_dirs[ $i ] );
+			// Keep the official checksums: the admin must still see how far the snapshot strays from the WordPress original.
+			$state['snapshot_official'][ $slug ] = array();
 			foreach ( array_keys( $filtered ) as $path ) {
 				if ( 0 === strpos( $path, $dir . '/' ) ) {
+					$state['snapshot_official'][ $slug ][ substr( $path, strlen( $dir ) + 1 ) ] = $filtered[ $path ];
 					unset( $filtered[ $path ] );
 				}
 			}
@@ -967,7 +975,7 @@ class KIG_Scan {
 
 		$state['modified'] = array_values( $state['modified'] );
 
-		unset( $state['files'], $state['actual_files'], $state['pointer'], $state['snapshot_themes'], $state['bundled_themes'] );
+		unset( $state['files'], $state['actual_files'], $state['pointer'], $state['snapshot_themes'], $state['snapshot_official'], $state['bundled_themes'] );
 	}
 
 	/**
@@ -977,9 +985,11 @@ class KIG_Scan {
 	 */
 	private function check_bundled_theme_snapshots( array &$state ): void {
 		foreach ( $state['snapshot_themes'] ?? array() as $slug ) {
-			$dir    = 'wp-content/themes/' . $slug;
-			$theme  = wp_get_theme( $slug );
-			$result = $this->compare_with_snapshot( KIG_Utils::read_theme_checksum_json( $slug ), $theme->get_stylesheet_directory(), (string) $theme->get( 'Version' ) );
+			$dir      = 'wp-content/themes/' . $slug;
+			$theme    = wp_get_theme( $slug );
+			$root     = $theme->get_stylesheet_directory();
+			$snapshot = KIG_Utils::read_theme_checksum_json( $slug );
+			$result   = $this->compare_with_snapshot( $snapshot, $root, (string) $theme->get( 'Version' ) );
 
 			if ( is_wp_error( $result ) ) {
 				$state['errors'][] = array(
@@ -1001,6 +1011,31 @@ class KIG_Scan {
 			foreach ( $result['errors'] as $entry ) {
 				$entry['file']       = $dir . '/' . $entry['file'];
 				$state['errors'][] = $entry;
+			}
+
+			// The snapshot is stored in a writable folder, so it could be forged: always show what it accepts.
+			$official = $state['snapshot_official'][ $slug ] ?? array();
+			$flagged  = array_flip( array_merge( wp_list_pluck( $result['modified'], 'file' ), $result['missing'], $result['added'] ) );
+			$accepted = 0;
+			foreach ( array_unique( array_merge( array_keys( $official ), array_keys( $snapshot['files'] ) ) ) as $relative ) {
+				if ( isset( $flagged[ $relative ] ) ) {
+					continue;
+				}
+				$md5 = is_file( $root . '/' . $relative ) ? md5_file( $root . '/' . $relative ) : '';
+				if ( ! isset( $official[ $relative ] ) || strtolower( (string) $official[ $relative ] ) !== $md5 ) {
+					$accepted++;
+				}
+			}
+
+			if ( $accepted > 0 ) {
+				$name             = $theme->get( 'Name' );
+				$state['notes'][] = sprintf(
+					/* translators: 1: Theme name, 2: number of files, 3: snapshot date. */
+					__( '%1$s: %2$d file(s) differ from the WordPress original and are accepted by your snapshot of %3$s.', 'k-integrity-guard' ),
+					$name ? $name : $slug,
+					$accepted,
+					wp_date( get_option( 'date_format' ), (int) ( $snapshot['generated_at'] ?? 0 ) )
+				);
 			}
 		}
 	}
@@ -1160,7 +1195,7 @@ class KIG_Scan {
 		$status = $state['status'] ?? 'pending';
 
 		if ( 'pending' === $status ) {
-			$prepared = $this->{$config['prepare']}();
+			$prepared = $this->{$config['prepare']}( $state );
 			$items    = array();
 
 			foreach ( $prepared['items'] as $key => $item ) {
@@ -1447,9 +1482,10 @@ class KIG_Scan {
 	 *
 	 * @return array{items:array<string,array<string,string>>,skipped:array<int,array<string,string>>}
 	 */
-	private function prepare_wporg_themes(): array {
+	private function prepare_wporg_themes( array $state = array() ): array {
 		$options = $this->settings->get_options();
 		$ignores = $options['third_party_themes']['ignore'] ?? array();
+		$bundled = empty( $state['core_covers_bundled'] ) ? array() : $this->bundled_theme_slugs();
 		$items   = array();
 		$skipped = array();
 
@@ -1464,6 +1500,8 @@ class KIG_Scan {
 
 			if ( $theme->get( 'Template' ) ) {
 				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Child theme - inherits from parent.', 'k-integrity-guard' ) );
+			} elseif ( in_array( $stylesheet, $bundled, true ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Ships with WordPress - checked by the core scan.', 'k-integrity-guard' ) );
 			} elseif ( empty( $info['is_wporg'] ) ) {
 				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Not available on WordPress.org.', 'k-integrity-guard' ) );
 			} elseif ( ! empty( $ignores[ $stylesheet ] ) ) {
@@ -1518,6 +1556,29 @@ class KIG_Scan {
 			'items'   => $items,
 			'skipped' => $skipped,
 		);
+	}
+
+	/**
+	 * Slugs of the default themes that ship with the installed WordPress version (from the cached core checksums).
+	 *
+	 * @return array<int,string> Empty when the core checksums are unavailable.
+	 */
+	private function bundled_theme_slugs(): array {
+		$locale    = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+		$checksums = $this->fetch_core_checksums( get_bloginfo( 'version' ), $locale );
+		if ( is_wp_error( $checksums ) ) {
+			return array();
+		}
+
+		$slugs = array();
+		foreach ( array_keys( $checksums['checksums'] ) as $path ) {
+			$dir = $this->resolve_core_theme_directory( (string) $path );
+			if ( null !== $dir ) {
+				$slugs[ substr( $dir, strlen( 'wp-content/themes/' ) ) ] = true;
+			}
+		}
+
+		return array_keys( $slugs );
 	}
 
 	/**
