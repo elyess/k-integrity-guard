@@ -31,6 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<form method="post" action="options.php" id="wpig-third-party-plugins-form">
 			<?php
 				settings_fields( KIG_Settings::PAGE );
+				KIG_Settings::section_field( 'third_party' );
 				$settings->field_third_party_list();
 				submit_button( __( 'Save Plugin Settings', 'k-integrity-guard' ), 'primary', 'submit', true, array( 'id' => 'wpig-third-party-plugins-submit' ) );
 			?>
@@ -47,6 +48,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<form method="post" action="options.php" id="wpig-third-party-themes-form">
 			<?php
 				settings_fields( KIG_Settings::PAGE );
+				KIG_Settings::section_field( 'third_party_themes' );
 				$settings->field_third_party_themes_list();
 				submit_button( __( 'Save Theme Settings', 'k-integrity-guard' ), 'primary', 'submit', true, array( 'id' => 'wpig-third-party-themes-submit' ) );
 			?>

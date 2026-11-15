@@ -9,8 +9,6 @@ class KIG_Settings {
     public function __construct()
     {
         add_action('admin_init', [$this, 'register']);
-        // Optional: react to option changes (e.g., schedule/unschedule cron)
-        add_action('update_option_' . self::OPTION, [$this, 'handle_cron'], 10, 3);
         // Settings UI assets and AJAX.
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('wp_ajax_kig_generate_checksum', [$this, 'ajax_generate_checksum']);
@@ -36,6 +34,7 @@ class KIG_Settings {
             __('General', 'k-integrity-guard'),
             function () {
                 echo '<p>' . esc_html__("Basic configuration for K'Integrity Guard.", 'k-integrity-guard') . '</p>';
+                self::section_field('general');
             },
             self::PAGE
         );
@@ -79,6 +78,7 @@ class KIG_Settings {
                 'plugins' => true,
                 'themes'  => true,
                 'third_party_plugins' => false,
+                'third_party_themes'  => false,
             ],
             'third_party' => [
                 'ignore' => [],
@@ -89,19 +89,27 @@ class KIG_Settings {
         ];
     }
 
-    /** Sanitize and normalize input */
+    /** Hidden field telling sanitize() which settings form was posted. */
+    public static function section_field($section) {
+        printf('<input type="hidden" name="%1$s[_section]" value="%2$s" />', esc_attr(self::OPTION), esc_attr($section));
+    }
+
+    /**
+     * Sanitize and normalize input.
+     *
+     * The settings page has several forms posting the same option, so only the
+     * posted section is overwritten; the rest is kept from the stored value.
+     */
     public function sanitize($input) {
-        $defaults = $this->defaults();
-        $out = $defaults;
+        $out = $this->get_options();
 
-        if (is_array($input)) {
-            // Checkbox: present => true; absent => false
-            $out['daily_scan_enabled'] = !empty($input['daily_scan_enabled']);
+        if (!is_array($input)) {
+            return $out;
+        }
 
-            $out['targets']['core']    = !empty($input['targets']['core']);
-            $out['targets']['plugins'] = !empty($input['targets']['plugins']);
-            $out['targets']['themes']  = !empty($input['targets']['themes']);
+        $section = isset($input['_section']) ? sanitize_key($input['_section']) : 'general';
 
+        if ('third_party' === $section) {
             // Third-party ignore map
             $out['third_party']['ignore'] = [];
             if (!empty($input['third_party']['ignore']) && is_array($input['third_party']['ignore'])) {
@@ -110,7 +118,7 @@ class KIG_Settings {
                     $out['third_party']['ignore'][$file] = !empty($val);
                 }
             }
-
+        } elseif ('third_party_themes' === $section) {
             // Third-party themes ignore map
             $out['third_party_themes']['ignore'] = [];
             if (!empty($input['third_party_themes']['ignore']) && is_array($input['third_party_themes']['ignore'])) {
@@ -118,6 +126,14 @@ class KIG_Settings {
                     $stylesheet = sanitize_text_field($stylesheet);
                     $out['third_party_themes']['ignore'][$stylesheet] = !empty($val);
                 }
+            }
+        } else {
+            // General section. Checkbox: present => true; absent => false
+            $out['daily_scan_enabled'] = !empty($input['daily_scan_enabled']);
+
+            $out['targets'] = [];
+            foreach (array_keys($this->defaults()['targets']) as $key) {
+                $out['targets'][$key] = !empty($input['targets'][$key]);
             }
         }
 
@@ -144,6 +160,8 @@ class KIG_Settings {
             'core'    => __('WordPress Core', 'k-integrity-guard'),
             'plugins' => __('Plugins', 'k-integrity-guard'),
             'themes'  => __('Themes', 'k-integrity-guard'),
+            'third_party_plugins' => __('Third-Party Plugins (snapshot)', 'k-integrity-guard'),
+            'third_party_themes'  => __('Third-Party Themes (snapshot)', 'k-integrity-guard'),
         ];
 
         echo '<fieldset>';
@@ -166,21 +184,6 @@ class KIG_Settings {
     public function get_options() {
         $stored = get_option(self::OPTION, []);
         return wp_parse_args(is_array($stored) ? $stored : [], $this->defaults());
-    }
-
-    /** Optional: schedule/unschedule daily event when the option changes */
-    public function handle_cron($old_value, $value, $option) {
-        if ($option !== self::OPTION) return;
-
-        $was = !empty($old_value['daily_scan_enabled']);
-        $now = !empty($value['daily_scan_enabled']);
-
-        if ($now && !$was && !wp_next_scheduled('kig_daily_scan')) {
-            wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'kig_daily_scan');
-        } elseif (!$now && $was) {
-            $timestamp = wp_next_scheduled('kig_daily_scan');
-            if ($timestamp) wp_unschedule_event($timestamp, 'kig_daily_scan');
-        }
     }
 
     /**
@@ -241,9 +244,6 @@ class KIG_Settings {
     public function field_third_party_list() {
         if ( ! class_exists( 'KIG_Third_Party_Plugins_Table' ) ) {
             require_once dirname( __FILE__ ) . '/class-kig-third-party-table.php';
-        }
-        if ( ! class_exists( 'KIG_Utils' ) ) {
-            require_once dirname( __FILE__ ) . '/class-kig-utils.php';
         }
 
         $opts    = $this->get_options();
@@ -306,9 +306,6 @@ class KIG_Settings {
     public function field_third_party_themes_list() {
         if ( ! class_exists( 'KIG_Third_Party_Themes_Table' ) ) {
             require_once dirname( __FILE__ ) . '/class-kig-third-party-table.php';
-        }
-        if ( ! class_exists( 'KIG_Utils' ) ) {
-            require_once dirname( __FILE__ ) . '/class-kig-utils.php';
         }
 
         $opts    = $this->get_options();
@@ -373,10 +370,6 @@ class KIG_Settings {
             wp_send_json_error(['message' => __('Invalid plugin.', 'k-integrity-guard')], 400);
         }
 
-        if (!class_exists('KIG_Utils')) {
-            require_once dirname(__FILE__) . '/class-wpig-utils.php';
-        }
-
         $result = KIG_Utils::generate_plugin_checksum_json($plugin_file);
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
@@ -401,10 +394,6 @@ class KIG_Settings {
         $stylesheet = isset($_POST['stylesheet']) ? sanitize_text_field(wp_unslash($_POST['stylesheet'])) : '';
         if ('' === $stylesheet) {
             wp_send_json_error(['message' => __('Invalid theme.', 'k-integrity-guard')], 400);
-        }
-
-        if (!class_exists('KIG_Utils')) {
-            require_once dirname(__FILE__) . '/class-wpig-utils.php';
         }
 
         $result = KIG_Utils::generate_theme_checksum_json($stylesheet);

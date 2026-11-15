@@ -9,47 +9,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Handle bulk and single actions.
-if ( isset( $_GET['action'] ) ) {
-	$action = sanitize_key( $_GET['action'] );
+// Delete, bulk delete and empty-history are handled in K_Integrity_Guard::handle_history_actions() before output.
+// Handle view details.
+if ( isset( $_GET['action'], $_GET['scan_id'] ) && 'view' === sanitize_key( $_GET['action'] ) ) {
+	$scan_id = absint( $_GET['scan_id'] );
+	$scan    = KIG_DB::get_scan( $scan_id );
 
-	// Handle single delete.
-	if ( 'delete' === $action && isset( $_GET['scan_id'] ) ) {
-		$scan_id = absint( $_GET['scan_id'] );
-		if ( check_admin_referer( 'delete_scan_' . $scan_id ) ) {
-			KIG_DB::delete_scan( $scan_id );
-			wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&deleted=1' ) );
-			exit;
-		}
+	if ( $scan ) {
+		include __DIR__ . '/history-detail.php';
+		return;
 	}
-
-	// Handle view details.
-	if ( 'view' === $action && isset( $_GET['scan_id'] ) ) {
-		$scan_id = absint( $_GET['scan_id'] );
-		$scan    = KIG_DB::get_scan( $scan_id );
-
-		if ( $scan ) {
-			include __DIR__ . '/history-detail.php';
-			return;
-		}
-	}
-}
-
-// Handle bulk actions.
-if ( isset( $_POST['action'] ) && 'delete' === $_POST['action'] && ! empty( $_POST['scan_ids'] ) ) {
-	check_admin_referer( 'bulk-scans' );
-	$scan_ids = array_map( 'absint', $_POST['scan_ids'] );
-	KIG_DB::delete_scans( $scan_ids );
-	wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&deleted=' . count( $scan_ids ) ) );
-	exit;
-}
-
-// Handle empty history action.
-if ( isset( $_POST['kig_empty_history'] ) ) {
-	check_admin_referer( 'kig_empty_history' );
-	$deleted_count = KIG_DB::delete_all_scans();
-	wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&emptied=' . $deleted_count ) );
-	exit;
 }
 
 $table = new KIG_History_Table();
