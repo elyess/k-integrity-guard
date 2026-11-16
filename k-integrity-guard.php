@@ -1,14 +1,16 @@
 <?php
 /**
- * Plugin Name: K'Integrity Guard
- * Description: Monitors and protects your WordPress core files, themes, and plugins from unauthorized changes.
- * Version: 1.1.0
- * Author: Elyes Zouaghi
- * Author URI: https://github.com/elyess/k-integrity-guard
- * License: GPL-2.0+
- * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain: k-integrity-guard
- * Domain Path: /languages
+ * Plugin Name:       K'Integrity Guard
+ * Plugin URI:        https://github.com/elyess/k-integrity-guard
+ * Description:       Detects unexpected changes to WordPress core, plugin and theme files by comparing them with official WordPress.org checksums or your own snapshots.
+ * Version:           1.2.0
+ * Requires at least: 6.0
+ * Requires PHP:      7.4
+ * Author:            Elyes Zouaghi
+ * Author URI:        https://github.com/elyess
+ * License:           GPLv2 or later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       k-integrity-guard
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -23,12 +25,11 @@ require_once __DIR__ . '/includes/class-kig-history-table.php';
 
 class K_Integrity_Guard {
 
-	const VERSION = '1.1.0';
+	const VERSION = '1.2.0';
 
 
 	const CAPABILITY = 'manage_options';
 
-	//const SLUG_PLUGIN = 'k_integrity_guard';
 	const SLUG_SCAN = 'k_integrity_guard_scan';
 	const SLUG_SETTINGS = 'k_integrity_guard_settings';
 	const SLUG_HISTORY = 'k_integrity_guard_history';
@@ -114,7 +115,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
 			[$this, 'render_settings_page']
 		);
 
-		add_submenu_page(
+		$history_hook = add_submenu_page(
 			self::SLUG_SCAN,
 			__('History', 'k-integrity-guard'),
 			__('History', 'k-integrity-guard'),
@@ -122,6 +123,52 @@ add_action('admin_enqueue_scripts', function ($hook) {
 			self::SLUG_HISTORY,
 			[$this, 'render_history_page']
 		);
+		if ($history_hook) {
+			add_action('load-' . $history_hook, [$this, 'handle_history_actions']);
+		}
+	}
+
+	/**
+	 * Handle History page delete actions before any output, so redirects work.
+	 */
+	public function handle_history_actions(): void {
+		if (!current_user_can(self::CAPABILITY)) return;
+
+		$redirect = admin_url('admin.php?page=' . self::SLUG_HISTORY);
+
+		// Single delete.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce is verified by check_admin_referer() below before anything is deleted.
+		if (isset($_GET['action'], $_GET['scan_id']) && 'delete' === sanitize_key($_GET['action'])) {
+			$scan_id = absint($_GET['scan_id']);
+			check_admin_referer('delete_scan_' . $scan_id);
+			KIG_DB::delete_scan($scan_id);
+			wp_safe_redirect($redirect . '&deleted=1');
+			exit;
+		}
+
+		// Bulk delete: WP_List_Table posts the top selector as 'action' and the bottom one as 'action2' (-1 = none).
+		$bulk = '';
+		foreach (['action', 'action2'] as $key) {
+			if (isset($_POST[$key]) && '-1' !== $_POST[$key]) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				$bulk = sanitize_key(wp_unslash($_POST[$key])); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				break;
+			}
+		}
+		if ('delete' === $bulk && !empty($_POST['scan_ids'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			check_admin_referer('bulk-scans');
+			$scan_ids = array_map('absint', (array) wp_unslash($_POST['scan_ids']));
+			KIG_DB::delete_scans($scan_ids);
+			wp_safe_redirect($redirect . '&deleted=' . count($scan_ids));
+			exit;
+		}
+
+		// Empty history.
+		if (isset($_POST['kig_empty_history'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			check_admin_referer('kig_empty_history');
+			$deleted_count = KIG_DB::delete_all_scans();
+			wp_safe_redirect($redirect . '&emptied=' . $deleted_count);
+			exit;
+		}
 	}
 
 	public function plugin_action_links(array $links) {
@@ -200,6 +247,7 @@ private function is_network_active() {
     if ($this->get_global_notice_flag() !== 'yes') return;
 
     // Skip on the scan page itself
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only compares the current admin page slug to hide the notice.
     if (isset($_GET['page']) && sanitize_key($_GET['page']) === self::SLUG_SCAN) return;
 
     $scan_url     = add_query_arg(['page' => self::SLUG_SCAN, 'run_first_scan' => 1], admin_url('admin.php'));
@@ -238,9 +286,7 @@ public function capture_plugin_changes($upgrader, $hook_extra) {
 /** Remove checksum JSON when a plugin is deleted. */
 public function handle_deleted_plugin($plugin_file, $deleted) {
     if (!$deleted) return;
-    if (class_exists('KIG_Utils')) {
-        KIG_Utils::delete_checksum_file($plugin_file);
-    }
+    KIG_Utils::delete_checksum_file($plugin_file);
     $existing = get_transient('kig_changed_plugins');
     if (is_array($existing)) {
         $existing = array_diff($existing, [$plugin_file]);
@@ -259,9 +305,6 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
     $opts = get_option(KIG_Settings::OPTION, []);
     $ignores = $opts['third_party']['ignore'] ?? [];
 
-    if (!class_exists('KIG_Utils')) {
-        require_once __DIR__ . '/includes/class-kig-utils.php';
-    }
     $sources = KIG_Utils::detect_plugin_sources();
 
     $todo = [];
@@ -311,9 +354,7 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	/** Remove checksum JSON when a theme is deleted. */
 	public function handle_deleted_theme($stylesheet, $deleted, $theme) {
 	    if (!$deleted) return;
-	    if (class_exists('KIG_Utils')) {
-	        KIG_Utils::delete_theme_checksum_file($stylesheet);
-	    }
+	    KIG_Utils::delete_theme_checksum_file($stylesheet);
 	    $existing = get_transient('kig_changed_themes');
 	    if (is_array($existing)) {
 	        $existing = array_diff($existing, [$stylesheet]);
@@ -331,15 +372,14 @@ public function handle_deleted_plugin($plugin_file, $deleted) {
 	    $opts = get_option(KIG_Settings::OPTION, []);
 	    $ignores = $opts['third_party_themes']['ignore'] ?? [];
 
-	    if (!class_exists('KIG_Utils')) {
-	        require_once __DIR__ . '/includes/class-kig-utils.php';
-	    }
 	    $sources = KIG_Utils::detect_theme_sources();
 
 	    $todo = [];
 	    foreach ($changed as $stylesheet) {
 	        if (!empty($ignores[$stylesheet])) continue;
-	        if (empty($sources[$stylesheet]) || !empty($sources[$stylesheet]['is_wporg'])) continue;
+	        if (empty($sources[$stylesheet])) continue;
+	        // WordPress.org themes are snapshot-checked too, but only nag when the admin already made a snapshot.
+	        if (!empty($sources[$stylesheet]['is_wporg']) && null === KIG_Utils::read_theme_checksum_json($stylesheet)) continue;
 	        if (KIG_Utils::theme_checksum_is_stale($stylesheet)) {
 	            $todo[] = $stylesheet;
 	        }
@@ -381,4 +421,8 @@ register_activation_hook(__FILE__, function ($network_wide) {
     
     // Create scan history table.
     KIG_DB::create_table();
+});
+
+register_deactivation_hook(__FILE__, function () {
+    wp_clear_scheduled_hook('kig_daily_scan');
 });

@@ -31,28 +31,6 @@ class KIG_Scan {
 	private const MAX_SYNC_STEPS = 5000;
 
 	/**
-	 * WordPress default bundled themes.
-	 *
-	 * These themes are verified as part of WordPress core scan.
-	 */
-	private const WP_DEFAULT_THEMES = array(
-		'twentytwentyfour',
-		'twentytwentythree',
-		'twentytwentytwo',
-		'twentytwentyone',
-		'twentytwenty',
-		'twentynineteen',
-		'twentyseventeen',
-		'twentysixteen',
-		'twentyfifteen',
-		'twentyfourteen',
-		'twentythirteen',
-		'twentytwelve',
-		'twentyeleven',
-		'twentyten',
-	);
-
-	/**
 	 * Absolute path to the main plugin file.
 	 *
 	 * @var string
@@ -123,7 +101,7 @@ class KIG_Scan {
 			return;
 		}
 
-		$handle = 'wpig-scan';
+		$handle = 'kig-scan';
 		$src    = plugin_dir_url( $this->plugin_file ) . 'assets/js/scan.js';
 
 		wp_enqueue_script( $handle, $src, array( 'jquery' ), $this->version, true );
@@ -132,7 +110,7 @@ class KIG_Scan {
 
 		wp_localize_script(
 			$handle,
-			'wpigScan',
+			'kigScan',
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonces'  => array(
@@ -166,6 +144,8 @@ class KIG_Scan {
 					'coreHeading'        => esc_html__( 'WordPress Core', 'k-integrity-guard' ),
 					'pluginsHeading'     => esc_html__( 'Plugins', 'k-integrity-guard' ),
 					'themesHeading'      => esc_html__( 'Themes', 'k-integrity-guard' ),
+					'thirdPartyPluginsHeading' => esc_html__( 'Third-Party Plugins', 'k-integrity-guard' ),
+					'thirdPartyThemesHeading'  => esc_html__( 'Third-Party Themes', 'k-integrity-guard' ),
 					/* translators: %d: Number of skipped items. */
 					'skippedLabel'       => esc_html__( 'Skipped (%d)', 'k-integrity-guard' ),
 					/* translators: %d: Number of errors. */
@@ -206,6 +186,7 @@ class KIG_Scan {
 			'plugins'             => esc_html__( 'Plugins', 'k-integrity-guard' ),
 			'themes'              => esc_html__( 'Themes', 'k-integrity-guard' ),
 			'third_party_plugins' => esc_html__( 'Third-Party Plugins', 'k-integrity-guard' ),
+			'third_party_themes'  => esc_html__( 'Third-Party Themes', 'k-integrity-guard' ),
 		);
 	}
 
@@ -319,6 +300,7 @@ class KIG_Scan {
 		} while ( ! $result['completed'] );
 
 		$this->persist_scan_result( $job );
+		$this->db->delete_old_scans( 90 );
 	}
 
 	/**
@@ -393,10 +375,9 @@ class KIG_Scan {
 			);
 		}
 
-		$include_core_themes = in_array( 'themes', $targets, true );
-
-		if ( $include_core_themes && isset( $target_states['core'] ) ) {
-			$target_states['core']['include_core_themes'] = true;
+		// The core scan covers the bundled default themes; the themes target must not check them a second time.
+		if ( isset( $target_states['core'], $target_states['themes'] ) ) {
+			$target_states['themes']['core_covers_bundled'] = true;
 		}
 
 		return array(
@@ -458,6 +439,7 @@ class KIG_Scan {
 		$message    = '';
 		$performed  = 0;
 		$operations = max( 1, $operations );
+		$extensions = $this->get_extension_targets();
 
 		while ( $performed < $operations && empty( $job['completed'] ) ) {
 			$total_targets = count( $job['targets'] );
@@ -476,94 +458,43 @@ class KIG_Scan {
 
 			$target = $job['targets'][ $current_index ];
 			$state  = &$job['target_states'][ $target ];
+			$performed++;
 
-			switch ( $target ) {
-				case 'core':
-					$result   = $this->advance_core_target( $state );
-					$message  = $result['message'];
-					$performed++;
+			if ( 'core' === $target ) {
+				$result = $this->advance_core_target( $state );
+			} elseif ( isset( $extensions[ $target ] ) ) {
+				$result = $this->advance_extension_target( $state, $extensions[ $target ] );
+			} else {
+				$state['status']  = 'skipped';
+				$state['message'] = __( 'Scanning for this target is not yet available.', 'k-integrity-guard' );
+				$result           = array(
+					'complete' => true,
+					'message'  => $state['message'],
+				);
+			}
 
-					if ( ! empty( $result['error'] ) ) {
-						$job['errors'][] = array(
-							'target'  => $target,
-							'message' => $result['message'],
-						);
-					}
+			$message = $result['message'];
 
-					if ( ! empty( $result['complete'] ) ) {
-						$job['results']['core'] = $this->summarize_core_result( $state );
-						$job['current_target']++;
-					}
-					break;
+			if ( ! empty( $result['error'] ) ) {
+				$job['errors'][] = array(
+					'target'  => $target,
+					'message' => $result['message'],
+				);
+			}
 
-				case 'plugins':
-					$result   = $this->advance_plugins_target( $state );
-					$message  = $result['message'];
-					$performed++;
+			if ( ! empty( $result['complete'] ) ) {
+				if ( 'core' === $target ) {
+					$job['results'][ $target ] = $this->summarize_core_result( $state );
+				} elseif ( isset( $extensions[ $target ] ) ) {
+					$job['results'][ $target ] = $this->summarize_extension_result( $state, $extensions[ $target ] );
+				} else {
+					$job['results'][ $target ] = array(
+						'status'  => 'skipped',
+						'message' => $state['message'],
+					);
+				}
 
-					if ( ! empty( $result['error'] ) ) {
-						$job['errors'][] = array(
-							'target'  => $target,
-							'message' => $result['message'],
-						);
-					}
-
-					if ( ! empty( $result['complete'] ) ) {
-						$job['results']['plugins'] = $this->summarize_plugins_result( $state );
-						$job['current_target']++;
-					}
-					break;
-
-				case 'themes':
-					$result   = $this->advance_themes_target( $state );
-					$message  = $result['message'];
-					$performed++;
-
-					if ( ! empty( $result['error'] ) ) {
-						$job['errors'][] = array(
-							'target'  => $target,
-							'message' => $result['message'],
-						);
-					}
-
-					if ( ! empty( $result['complete'] ) ) {
-						$job['results']['themes'] = $this->summarize_themes_result( $state );
-						$job['current_target']++;
-					}
-					break;
-
-				case 'third_party_plugins':
-					$result   = $this->advance_third_party_plugins_target( $state );
-					$message  = $result['message'];
-					$performed++;
-
-					if ( ! empty( $result['error'] ) ) {
-						$job['errors'][] = array(
-							'target'  => $target,
-							'message' => $result['message'],
-						);
-					}
-
-					if ( ! empty( $result['complete'] ) ) {
-						$job['results']['third_party_plugins'] = $this->summarize_third_party_plugins_result( $state );
-						$job['current_target']++;
-					}
-					break;
-
-				default:
-					if ( 'pending' === ( $state['status'] ?? 'pending' ) ) {
-						$state['status']  = 'skipped';
-						$state['message'] = __( 'Scanning for this target is not yet available.', 'k-integrity-guard' );
-						$job['results'][ $target ] = array(
-							'status'  => 'skipped',
-							'message' => $state['message'],
-						);
-						$message = $state['message'];
-					}
-
-					$job['current_target']++;
-					$performed++;
-					break;
+				$job['current_target']++;
 			}
 
 			unset( $state );
@@ -702,8 +633,6 @@ class KIG_Scan {
 		$state['version'] = $version;
 		$state['locale']  = $locale;
 
-		$include_themes = ! empty( $state['include_core_themes'] );
-
 		$checksums = $this->fetch_core_checksums( $version, $locale );
 
 		if ( is_wp_error( $checksums ) ) {
@@ -713,10 +642,12 @@ class KIG_Scan {
 		$state['locale'] = $checksums['locale'];
 
 		$allowed_theme_dirs = array();
-		$filtered           = $this->filter_core_checksums( $checksums['checksums'], $include_themes, $allowed_theme_dirs );
-		$files              = array_keys( $filtered );
+		$filtered           = $this->filter_core_checksums( $checksums['checksums'], $allowed_theme_dirs );
 
-		$state['checksums'] = $filtered;
+		$this->apply_theme_snapshots( $state, $filtered, $allowed_theme_dirs );
+
+		$files = array_keys( $filtered );
+
 		$state['files']     = $files;
 		$state['total']     = count( $files );
 		$state['processed'] = 0;
@@ -726,19 +657,61 @@ class KIG_Scan {
 		$state['added']     = array();
 		$state['errors']    = array();
 
-		if ( $include_themes ) {
-			$state['allowed_theme_dirs'] = $allowed_theme_dirs;
-		} else {
-			unset( $state['allowed_theme_dirs'] );
-		}
-
 		$state['actual_files'] = $this->list_core_files( $allowed_theme_dirs );
 
 		return true;
 	}
 
 	/**
-	 * Fetch WordPress core checksums from WordPress.org with locale fallback.
+	 * Move bundled themes that have an up-to-date snapshot out of the core checksum check.
+	 *
+	 * A snapshot holds local edits the admin accepted, so these themes are checked against it in finalize_core_target().
+	 *
+	 * @param array<string,mixed>  $state              Core target state (passed by reference).
+	 * @param array<string,string> $filtered           Core checksums (passed by reference).
+	 * @param array<int,string>    $allowed_theme_dirs Bundled theme paths to walk (passed by reference).
+	 */
+	private function apply_theme_snapshots( array &$state, array &$filtered, array &$allowed_theme_dirs ): void {
+		$state['snapshot_themes'] = array();
+		$state['notes']           = array();
+		foreach ( $allowed_theme_dirs as $i => $dir ) {
+			$slug     = substr( $dir, strlen( 'wp-content/themes/' ) );
+			$snapshot = 'index.php' === $slug ? null : KIG_Utils::read_theme_checksum_json( $slug );
+			if ( null === $snapshot ) {
+				continue;
+			}
+
+			// An update replaced the theme (and the local edits): the snapshot is outdated, so use the WordPress original.
+			$theme = wp_get_theme( $slug );
+			if ( (string) ( $snapshot['version'] ?? '' ) !== (string) $theme->get( 'Version' ) ) {
+				$state['notes'][] = sprintf(
+					/* translators: 1: Theme name, 2: snapshot version, 3: installed version. */
+					__( '%1$s: the snapshot is for version %2$s but %3$s is installed, so it was checked against the WordPress original. Generate a new snapshot if you edit it again.', 'k-integrity-guard' ),
+					$theme->get( 'Name' ) ? $theme->get( 'Name' ) : $slug,
+					(string) ( $snapshot['version'] ?? '' ),
+					(string) $theme->get( 'Version' )
+				);
+				continue;
+			}
+
+			$state['snapshot_themes'][] = $slug;
+			unset( $allowed_theme_dirs[ $i ] );
+			// Keep the official checksums: the admin must still see how far the snapshot strays from the WordPress original.
+			$state['snapshot_official'][ $slug ] = array();
+			foreach ( array_keys( $filtered ) as $path ) {
+				if ( 0 === strpos( $path, $dir . '/' ) ) {
+					$state['snapshot_official'][ $slug ][ substr( $path, strlen( $dir ) + 1 ) ] = $filtered[ $path ];
+					unset( $filtered[ $path ] );
+				}
+			}
+		}
+
+		$allowed_theme_dirs      = array_values( $allowed_theme_dirs );
+		$state['bundled_themes'] = array_values( array_diff( $allowed_theme_dirs, array( 'wp-content/themes/index.php' ) ) );
+	}
+
+	/**
+	 * Fetch WordPress core checksums from WordPress.org with locale fallback, cached for a day per version and locale.
 	 *
 	 * @param string $version WordPress version.
 	 * @param string $locale  Preferred locale.
@@ -749,6 +722,13 @@ class KIG_Scan {
 		$last_error = null;
 
 		foreach ( $candidates as $candidate ) {
+			$cache_key = 'kig_core_checksums_' . md5( $version . '|' . $candidate );
+			$cached    = get_transient( $cache_key );
+
+			if ( is_array( $cached ) ) {
+				return $cached;
+			}
+
 			$url      = add_query_arg(
 				array(
 					'version' => rawurlencode( $version ),
@@ -795,10 +775,14 @@ class KIG_Scan {
 				continue;
 			}
 
-			return array(
+			$result = array(
 				'checksums' => $data['checksums'],
 				'locale'    => isset( $data['locale'] ) ? (string) $data['locale'] : $candidate,
 			);
+
+			set_transient( $cache_key, $result, DAY_IN_SECONDS );
+
+			return $result;
 		}
 
 		return $last_error ? $last_error : new WP_Error( 'kig_checksum_unavailable', __( 'Unable to download WordPress core checksums.', 'k-integrity-guard' ) );
@@ -807,23 +791,40 @@ class KIG_Scan {
 	/**
 	 * Filter checksum map to exclude user controlled files.
 	 *
-	 * @param array<string,string> $checksums         Raw checksum map.
-	 * @param bool                 $include_themes    Whether to retain default theme checksums.
-	 * @param array<int,string>    $allowed_theme_dirs Populated with allowed theme directory prefixes when themes are included. Passed by reference.
+	 * Only the themes folder index file and the bundled theme folders that exist on disk are kept,
+	 * never the whole themes folder, so other themes are not reported as unexpected files.
+	 *
+	 * @param array<string,string> $checksums          Raw checksum map.
+	 * @param array<int,string>    $allowed_theme_dirs Populated with the bundled theme paths to walk. Passed by reference.
 	 * @return array<string,string>
 	 */
-	private function filter_core_checksums( array $checksums, bool $include_themes = false, array &$allowed_theme_dirs = array() ): array {
-		$filtered          = array();
-		$allowed_theme_map = array();
+	private function filter_core_checksums( array $checksums, array &$allowed_theme_dirs = array() ): array {
+		$filtered   = array();
+		$theme_dirs = array();
+		$root       = trailingslashit( ABSPATH );
 
 		foreach ( $checksums as $path => $hash ) {
 			$normalized = ltrim( wp_normalize_path( (string) $path ), '/' );
 
-			if ( $include_themes && 0 === strpos( $normalized, 'wp-content/themes' ) ) {
-				$theme_dir = $this->resolve_core_theme_directory( $normalized );
+			// Bundled themes are always checked here: they ship with WordPress and need no snapshot.
+			if ( 0 === strpos( $normalized, 'wp-content/themes/' ) ) {
+				if ( 'wp-content/themes/index.php' === $normalized ) {
+					$theme_dirs[ $normalized ] = true;
+				} else {
+					$theme_dir = $this->resolve_core_theme_directory( $normalized );
 
-				if ( null !== $theme_dir ) {
-					$allowed_theme_map[ $theme_dir ] = true;
+					if ( null === $theme_dir ) {
+						continue;
+					}
+
+					// A bundled theme the admin deleted must not be reported as missing.
+					if ( ! isset( $theme_dirs[ $theme_dir ] ) ) {
+						$theme_dirs[ $theme_dir ] = is_dir( $root . $theme_dir );
+					}
+
+					if ( ! $theme_dirs[ $theme_dir ] ) {
+						continue;
+					}
 				}
 
 				$filtered[ $normalized ] = (string) $hash;
@@ -837,85 +838,25 @@ class KIG_Scan {
 			$filtered[ $normalized ] = (string) $hash;
 		}
 
-		if ( $include_themes ) {
-			if ( ! empty( $allowed_theme_map ) ) {
-				$allowed_theme_map['wp-content/themes'] = true;
-			}
-			$allowed_theme_dirs = array_values( array_keys( $allowed_theme_map ) );
-		} else {
-			$allowed_theme_dirs = array();
-		}
+		$allowed_theme_dirs = array_keys( array_filter( $theme_dirs ) );
 
 		return $filtered;
 	}
 
 	/**
-	 * Resolve the theme directory prefix for a checksum path.
+	 * Resolve the bundled theme directory (wp-content/themes/<slug>) for a checksum path.
 	 *
 	 * @param string $path Normalized checksum path.
-	 * @return string|null
+	 * @return string|null Null when the path is not inside a theme folder.
 	 */
 	private function resolve_core_theme_directory( string $path ): ?string {
-		$normalized = ltrim( wp_normalize_path( $path ), '/' );
+		$parts = explode( '/', ltrim( wp_normalize_path( $path ), '/' ) );
 
-		if ( 0 !== strpos( $normalized, 'wp-content/themes' ) ) {
+		if ( count( $parts ) < 4 || 'wp-content' !== $parts[0] || 'themes' !== $parts[1] || '' === $parts[2] ) {
 			return null;
 		}
 
-		$parts = explode( '/', $normalized );
-
-		if ( count( $parts ) < 3 ) {
-			return 'wp-content/themes';
-		}
-
-		if ( 'themes' !== $parts[1] ) {
-			return null;
-		}
-
-		if ( count( $parts ) >= 4 ) {
-			$slug = $parts[2];
-			if ( '' !== $slug ) {
-				return 'wp-content/themes/' . $slug;
-			}
-		}
-
-		return 'wp-content/themes';
-	}
-
-	/**
-	 * Determine whether a path belongs to an allowed default theme directory.
-	 *
-	 * @param string        $path               Relative path from ABSPATH.
-	 * @param array<int,string> $allowed_theme_dirs Allowed theme directory prefixes.
-	 * @return bool
-	 */
-	private function is_allowed_theme_path( string $path, array $allowed_theme_dirs ): bool {
-		if ( empty( $allowed_theme_dirs ) ) {
-			return false;
-		}
-
-		$normalized = ltrim( wp_normalize_path( $path ), '/' );
-
-		foreach ( $allowed_theme_dirs as $allowed ) {
-			$allowed = ltrim( wp_normalize_path( $allowed ), '/' );
-
-			if ( $normalized === $allowed ) {
-				return true;
-			}
-
-			$allowed_with_slash   = $allowed . '/';
-			$normalized_with_slash = $normalized . '/';
-
-			if ( 0 === strpos( $normalized, $allowed_with_slash ) ) {
-				return true;
-			}
-
-			if ( 0 === strpos( $allowed_with_slash, $normalized_with_slash ) ) {
-				return true;
-			}
-		}
-
-		return false;
+		return 'wp-content/themes/' . $parts[2];
 	}
 
 	/**
@@ -928,7 +869,6 @@ class KIG_Scan {
 		$total   = (int) ( $state['total'] ?? 0 );
 		$pointer = (int) ( $state['pointer'] ?? 0 );
 		$files   = $state['files'] ?? array();
-		$checks  = $state['checksums'] ?? array();
 
 		if ( empty( $files ) || 0 === $total ) {
 			return array(
@@ -936,6 +876,15 @@ class KIG_Scan {
 				'message'  => __( 'No core files were available for scanning.', 'k-integrity-guard' ),
 			);
 		}
+
+		// Checksums live in a cache transient, not in job state, to keep the job state small.
+		$checksums = $this->fetch_core_checksums( (string) ( $state['version'] ?? '' ), (string) ( $state['locale'] ?? '' ) );
+
+		if ( is_wp_error( $checksums ) ) {
+			return array( 'error' => $checksums->get_error_message() );
+		}
+
+		$checks = $checksums['checksums'];
 
 		$chunk_size = self::CORE_CHUNK_SIZE;
 		$root       = trailingslashit( ABSPATH );
@@ -1013,6 +962,9 @@ class KIG_Scan {
 			}
 		}
 
+		$this->check_bundled_theme_snapshots( $state );
+		$this->note_edited_bundled_themes( $state );
+
 		if ( ! empty( $state['missing'] ) ) {
 			$state['missing'] = array_values( array_unique( $state['missing'] ) );
 		}
@@ -1023,7 +975,94 @@ class KIG_Scan {
 
 		$state['modified'] = array_values( $state['modified'] );
 
-		unset( $state['checksums'], $state['files'], $state['actual_files'], $state['pointer'], $state['allowed_theme_dirs'] );
+		unset( $state['files'], $state['actual_files'], $state['pointer'], $state['snapshot_themes'], $state['snapshot_official'], $state['bundled_themes'] );
+	}
+
+	/**
+	 * Check bundled themes that have a snapshot against that snapshot and merge the results into the core lists.
+	 *
+	 * @param array<string,mixed> $state Core target state (passed by reference).
+	 */
+	private function check_bundled_theme_snapshots( array &$state ): void {
+		foreach ( $state['snapshot_themes'] ?? array() as $slug ) {
+			$dir      = 'wp-content/themes/' . $slug;
+			$theme    = wp_get_theme( $slug );
+			$root     = $theme->get_stylesheet_directory();
+			$snapshot = KIG_Utils::read_theme_checksum_json( $slug );
+			$result   = $this->compare_with_snapshot( $snapshot, $root, (string) $theme->get( 'Version' ) );
+
+			if ( is_wp_error( $result ) ) {
+				$state['errors'][] = array(
+					'file'    => $dir,
+					'message' => $result->get_error_message(),
+				);
+				continue;
+			}
+
+			foreach ( $result['modified'] as $entry ) {
+				$entry['file']         = $dir . '/' . $entry['file'];
+				$state['modified'][] = $entry;
+			}
+			foreach ( array( 'missing', 'added' ) as $list ) {
+				foreach ( $result[ $list ] as $file ) {
+					$state[ $list ][] = $dir . '/' . $file;
+				}
+			}
+			foreach ( $result['errors'] as $entry ) {
+				$entry['file']       = $dir . '/' . $entry['file'];
+				$state['errors'][] = $entry;
+			}
+
+			// The snapshot is stored in a writable folder, so it could be forged: always show what it accepts.
+			$official = $state['snapshot_official'][ $slug ] ?? array();
+			$flagged  = array_flip( array_merge( wp_list_pluck( $result['modified'], 'file' ), $result['missing'], $result['added'] ) );
+			$accepted = 0;
+			foreach ( array_unique( array_merge( array_keys( $official ), array_keys( $snapshot['files'] ) ) ) as $relative ) {
+				if ( isset( $flagged[ $relative ] ) ) {
+					continue;
+				}
+				$md5 = is_file( $root . '/' . $relative ) ? md5_file( $root . '/' . $relative ) : '';
+				if ( ! isset( $official[ $relative ] ) || strtolower( (string) $official[ $relative ] ) !== $md5 ) {
+					$accepted++;
+				}
+			}
+
+			if ( $accepted > 0 ) {
+				$name             = $theme->get( 'Name' );
+				$state['notes'][] = sprintf(
+					/* translators: 1: Theme name, 2: number of files, 3: snapshot date. */
+					__( '%1$s: %2$d file(s) differ from the WordPress original and are accepted by your snapshot of %3$s.', 'k-integrity-guard' ),
+					$name ? $name : $slug,
+					$accepted,
+					wp_date( get_option( 'date_format' ), (int) ( $snapshot['generated_at'] ?? 0 ) )
+				);
+			}
+		}
+	}
+
+	/**
+	 * Explain edited bundled themes, since beginners often edit them instead of using a child theme.
+	 *
+	 * @param array<string,mixed> $state Core target state (passed by reference).
+	 */
+	private function note_edited_bundled_themes( array &$state ): void {
+		$changed = array_merge( wp_list_pluck( $state['modified'] ?? array(), 'file' ), $state['added'] ?? array() );
+
+		foreach ( $state['bundled_themes'] ?? array() as $dir ) {
+			$slug = substr( $dir, strlen( 'wp-content/themes/' ) );
+			$name = wp_get_theme( $slug )->get( 'Name' );
+
+			foreach ( $changed as $file ) {
+				if ( 0 === strpos( $file, $dir . '/' ) ) {
+					$state['notes'][] = sprintf(
+						/* translators: %s: Theme name. */
+						__( '%s: files differ from the WordPress original. Edits to a default theme are lost when it updates; use a child theme instead. If the changes are yours, generate a snapshot for this theme in Settings so only later changes are reported.', 'k-integrity-guard' ),
+						$name ? $name : $slug
+					);
+					break;
+				}
+			}
+		}
 	}
 
 	/**
@@ -1036,18 +1075,11 @@ class KIG_Scan {
 		$modified = count( $state['modified'] ?? array() );
 		$missing  = count( $state['missing'] ?? array() );
 		$added    = count( $state['added'] ?? array() );
-		$includes_themes = ! empty( $state['include_core_themes'] );
 
 		if ( 0 === $modified && 0 === $missing && 0 === $added ) {
-			if ( $includes_themes ) {
-				return __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
-			}
-
-			return __( 'WordPress core scan completed without integrity issues.', 'k-integrity-guard' );
-		}
-
-		if ( $includes_themes ) {
-			return sprintf(
+			$message = __( 'WordPress core and bundled themes scan completed without integrity issues.', 'k-integrity-guard' );
+		} else {
+			$message = sprintf(
 				/* translators: 1: modified count, 2: missing count, 3: added count. */
 				__( 'WordPress core and bundled themes issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
 				$modified,
@@ -1056,61 +1088,142 @@ class KIG_Scan {
 			);
 		}
 
-		return sprintf(
-			/* translators: 1: modified count, 2: missing count, 3: added count. */
-			__( 'WordPress core issues detected — %1$d modified, %2$d missing, %3$d unexpected files.', 'k-integrity-guard' ),
-			$modified,
-			$missing,
-			$added
-		);
+		return implode( ' ', array_merge( array( $message ), $state['notes'] ?? array() ) );
 	}
 
 	/**
 	 * Build summarized core result payload.
 	 *
+	 * Uses the same items/totals shape as the other targets; the file lists live in items[0].
+	 *
 	 * @param array<string,mixed> $state Target state.
 	 * @return array<string,mixed>
 	 */
 	private function summarize_core_result( array $state ): array {
+		$modified = $state['modified'] ?? array();
+		$missing  = $state['missing'] ?? array();
+		$added    = $state['added'] ?? array();
+		$errors   = $state['errors'] ?? array();
+		$failed   = 'error' === ( $state['status'] ?? '' );
+		$issues   = ! empty( $modified ) || ! empty( $missing ) || ! empty( $added );
+		$summary  = $failed
+			? (string) ( $state['error_message'] ?? __( 'Unable to scan WordPress core.', 'k-integrity-guard' ) )
+			: $this->build_core_summary_message( $state );
+
+		$item_status = 'ok';
+		if ( $failed ) {
+			$item_status = 'error';
+		} elseif ( $issues ) {
+			$item_status = 'issues';
+		}
+
 		return array(
 			'status'          => $state['status'] ?? 'unknown',
 			'version'         => $state['version'] ?? '',
 			'locale'          => $state['locale'] ?? '',
-			'themes_included' => ! empty( $state['include_core_themes'] ),
-			'modified'        => $state['modified'] ?? array(),
-			'missing'         => $state['missing'] ?? array(),
-			'added'           => $state['added'] ?? array(),
-			'errors'          => $state['errors'] ?? array(),
-			'summary'         => $this->build_core_summary_message( $state ),
+			'summary'         => $summary,
+			'items'           => array(
+				array(
+					'key'      => 'core',
+					'name'     => __( 'WordPress Core', 'k-integrity-guard' ),
+					'version'  => $state['version'] ?? '',
+					'status'   => $item_status,
+					'message'  => $summary,
+					'modified' => $modified,
+					'missing'  => $missing,
+					'added'    => $added,
+					'errors'   => $errors,
+				),
+			),
+			'skipped'         => array(),
+			'totals'          => array(
+				'verified' => $failed ? 0 : 1,
+				'issues'   => $issues ? 1 : 0,
+				'skipped'  => 0,
+				'errors'   => $failed ? 1 : 0,
+			),
 		);
 	}
 
 	/**
-	 * Advance the plugin scan state by one step.
+	 * Configuration of the extension targets (plugins and themes).
 	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
+	 * Each target names the method that builds its item list, the method that verifies one item,
+	 * its label and the message shown when nothing could be verified.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	private function get_extension_targets(): array {
+		$labels = $this->get_targets();
+
+		return array(
+			'plugins'             => array(
+				'label'   => $labels['plugins'],
+				'prepare' => 'prepare_wporg_plugins',
+				'verify'  => 'verify_wporg_plugin',
+				'empty'   => __( 'No WordPress.org plugins were available for verification.', 'k-integrity-guard' ),
+			),
+			'themes'              => array(
+				'label'   => $labels['themes'],
+				'prepare' => 'prepare_wporg_themes',
+				'verify'  => 'verify_theme_snapshot',
+				'empty'   => __( 'No WordPress.org themes with snapshots were available for verification.', 'k-integrity-guard' ),
+			),
+			'third_party_plugins' => array(
+				'label'   => $labels['third_party_plugins'],
+				'prepare' => 'prepare_third_party_plugins',
+				'verify'  => 'verify_third_party_plugin',
+				'empty'   => __( 'No third-party plugins with snapshots were available for verification.', 'k-integrity-guard' ),
+			),
+			'third_party_themes'  => array(
+				'label'   => $labels['third_party_themes'],
+				'prepare' => 'prepare_third_party_themes',
+				'verify'  => 'verify_theme_snapshot',
+				'empty'   => __( 'No third-party themes with snapshots were available for verification.', 'k-integrity-guard' ),
+			),
+		);
+	}
+
+	/**
+	 * Advance an extension target by one step: prepare the item list, then verify one item per step.
+	 *
+	 * @param array<string,mixed>  $state  Target state (passed by reference).
+	 * @param array<string,string> $config Target configuration from get_extension_targets().
 	 * @return array<string,mixed>
 	 */
-	private function advance_plugins_target( array &$state ): array {
+	private function advance_extension_target( array &$state, array $config ): array {
 		$status = $state['status'] ?? 'pending';
 
 		if ( 'pending' === $status ) {
-			$result = $this->prepare_plugins_target( $state );
+			$prepared = $this->{$config['prepare']}( $state );
+			$items    = array();
 
-			if ( is_wp_error( $result ) ) {
-				$state['status']  = 'error';
-				$state['message'] = $result->get_error_message();
-
-				return array(
-					'complete' => true,
-					'error'    => true,
-					'message'  => $state['message'],
+			foreach ( $prepared['items'] as $key => $item ) {
+				$items[ $key ] = array_merge(
+					$item,
+					array(
+						'key'      => (string) $key,
+						'status'   => 'pending',
+						'message'  => '',
+						'modified' => array(),
+						'missing'  => array(),
+						'added'    => array(),
+						'errors'   => array(),
+					)
 				);
 			}
 
-			if ( empty( $state['total'] ) ) {
+			$state['items']       = $items;
+			$state['order']       = array_keys( $items );
+			$state['skipped']     = $prepared['skipped'];
+			$state['errors']      = array();
+			$state['processed']   = 0;
+			$state['total']       = count( $items );
+			$state['issue_total'] = 0;
+
+			if ( 0 === $state['total'] ) {
 				$state['status']  = 'completed';
-				$state['message'] = __( 'No WordPress.org plugins were available for verification.', 'k-integrity-guard' );
+				$state['message'] = $config['empty'];
 
 				return array(
 					'complete' => true,
@@ -1120,7 +1233,11 @@ class KIG_Scan {
 			}
 
 			$state['status']  = 'processing';
-			$state['message'] = __( 'Preparing plugin verification…', 'k-integrity-guard' );
+			$state['message'] = sprintf(
+				/* translators: %s: Scan target label, e.g. "Plugins". */
+				__( 'Preparing verification: %s…', 'k-integrity-guard' ),
+				$config['label']
+			);
 
 			return array(
 				'complete' => false,
@@ -1129,298 +1246,103 @@ class KIG_Scan {
 			);
 		}
 
-		if ( 'processing' === $status ) {
-			$result = $this->process_next_plugin( $state );
+		if ( 'processing' !== $status ) {
+			return array(
+				'complete' => true,
+				'error'    => 'error' === $status,
+				'message'  => $state['message'] ?? '',
+			);
+		}
 
-			if ( ! empty( $result['finished'] ) ) {
-				$this->finalize_plugins_target( $state );
-				$state['status']  = 'completed';
-				$state['message'] = __( 'Plugin verification completed.', 'k-integrity-guard' );
+		$index = (int) $state['processed'];
 
-				return array(
-					'complete' => true,
-					'error'    => ! empty( $state['errors'] ),
-					'message'  => $state['message'],
-				);
-			}
+		if ( $index >= (int) $state['total'] ) {
+			$state['status']  = 'completed';
+			$state['message'] = $this->build_extension_summary_message( $state, $config );
+
+			return array(
+				'complete' => true,
+				'error'    => ! empty( $state['errors'] ),
+				'message'  => $state['message'],
+			);
+		}
+
+		$key  = $state['order'][ $index ];
+		$item = &$state['items'][ $key ];
+		$state['processed']++;
+
+		$result = $this->{$config['verify']}( $item );
+
+		if ( is_wp_error( $result ) ) {
+			$item['status']    = 'error';
+			$item['message']   = $result->get_error_message();
+			$state['errors'][] = array(
+				'key'     => (string) $key,
+				'name'    => $item['name'],
+				'message' => $item['message'],
+			);
+
+			$message = sprintf(
+				/* translators: %s: Plugin or theme name. */
+				__( 'Verification failed for %s.', 'k-integrity-guard' ),
+				$item['name']
+			);
+
+			unset( $item );
 
 			return array(
 				'complete' => false,
-				'error'    => ! empty( $result['error'] ),
-				'message'  => $result['message'],
-			);
-		}
-
-		return array(
-			'complete' => true,
-			'error'    => 'error' === $status,
-			'message'  => $state['message'] ?? '',
-		);
-	}
-
-	/**
-	 * Build plugin scan metadata.
-	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return true|WP_Error
-	 */
-	private function prepare_plugins_target( array &$state ) {
-		if ( ! class_exists( 'KIG_Utils' ) ) {
-			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', 'k-integrity-guard' ) );
-		}
-
-		$sources = KIG_Utils::detect_plugin_sources();
-		$plugins = array();
-		$order   = array();
-		$skipped = array();
-
-		foreach ( $sources as $file => $info ) {
-			$name     = isset( $info['name'] ) ? (string) $info['name'] : $file;
-			$name     = $this->sanitize_extension_label( $name );
-			$version  = isset( $info['version'] ) ? (string) $info['version'] : '';
-			$slug     = isset( $info['slug'] ) ? (string) $info['slug'] : '';
-			$is_wporg = ! empty( $info['is_wporg'] );
-
-			if ( ! $is_wporg ) {
-				$skipped[] = array(
-					'plugin' => $file,
-					'name'   => $name,
-					'reason' => __( 'Not available on WordPress.org.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			if ( '' === $slug ) {
-				$skipped[] = array(
-					'plugin' => $file,
-					'name'   => $name,
-					'reason' => __( 'Plugin slug could not be determined.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			if ( '' === $version ) {
-				$skipped[] = array(
-					'plugin' => $file,
-					'name'   => $name,
-					'reason' => __( 'Plugin version could not be determined.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			$plugins[ $file ] = array(
-				'plugin'   => $file,
-				'name'     => $name,
-				'slug'     => $slug,
-				'version'  => $version,
-				'status'   => 'pending',
-				'modified' => array(),
-				'missing'  => array(),
-				'added'    => array(),
-				'errors'   => array(),
-			);
-
-			$order[] = $file;
-		}
-
-		$state['plugins']   = $plugins;
-		$state['order']     = $order;
-		$state['skipped']   = $skipped;
-		$state['errors']    = array();
-		$state['processed'] = 0;
-		$state['total']     = count( $order );
-		$state['issue_total'] = 0;
-
-		return true;
-	}
-
-	/**
-	 * Process the next plugin pending verification.
-	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return array<string,mixed>
-	 */
-	private function process_next_plugin( array &$state ): array {
-		$order = $state['order'] ?? array();
-		$total = max( 1, (int) ( $state['total'] ?? count( $order ) ) );
-
-		foreach ( $order as $index => $key ) {
-			if ( empty( $state['plugins'][ $key ] ) ) {
-				continue;
-			}
-
-			$plugin = &$state['plugins'][ $key ];
-			if ( 'pending' !== ( $plugin['status'] ?? 'pending' ) ) {
-				unset( $plugin );
-				continue;
-			}
-
-			$result = $this->scan_single_plugin( $plugin );
-			$state['processed'] = (int) ( $state['processed'] ?? 0 ) + 1;
-
-			if ( is_wp_error( $result ) ) {
-				$error_message    = $result->get_error_message();
-				$plugin['status']  = 'error';
-				$plugin['message'] = $error_message;
-				$state['errors'][] = array(
-					'plugin'  => $key,
-					'name'    => $plugin['name'] ?? $key,
-					'message' => $error_message,
-				);
-
-				$message = sprintf(
-					/* translators: %s: Plugin name. */
-					__( 'Verification failed for plugin %s.', 'k-integrity-guard' ),
-					$plugin['name'] ?? $key
-				);
-
-				unset( $plugin );
-
-				return array(
-					'finished' => false,
-					'error'    => true,
-					'message'  => $message,
-				);
-			}
-
-			$plugin['modified'] = $result['modified'];
-			$plugin['missing']  = $result['missing'];
-			$plugin['added']    = $result['added'];
-			$plugin['errors']   = $result['errors'];
-			$plugin['status']   = $result['status'];
-			$plugin['message']  = $result['message'];
-
-			if ( 'issues' === $result['status'] ) {
-				$state['issue_total'] = (int) ( $state['issue_total'] ?? 0 ) + 1;
-			}
-
-			$message = sprintf(
-				/* translators: 1: plugin name, 2: current position, 3: total. */
-				__( 'Checked plugin %1$s (%2$d of %3$d).', 'k-integrity-guard' ),
-				$plugin['name'] ?? $key,
-				$index + 1,
-				$total
-			);
-
-			if ( ! empty( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-
-			unset( $plugin );
-
-			return array(
-				'finished' => false,
-				'error'    => false,
+				'error'    => true,
 				'message'  => $message,
 			);
 		}
 
+		$note       = $result['note'] ?? '';
+		$has_issues = '' !== $note || ! empty( $result['modified'] ) || ! empty( $result['missing'] ) || ! empty( $result['added'] );
+
+		$item['modified'] = $result['modified'];
+		$item['missing']  = $result['missing'];
+		$item['added']    = $result['added'];
+		$item['errors']   = $result['errors'];
+		$item['status']   = $has_issues ? 'issues' : 'ok';
+		$item['message']  = $has_issues
+			/* translators: %s: Plugin or theme name. */
+			? sprintf( __( 'Differences detected in %s.', 'k-integrity-guard' ), $item['name'] )
+			/* translators: %s: Plugin or theme name. */
+			: sprintf( __( 'No differences detected in %s.', 'k-integrity-guard' ), $item['name'] );
+
+		if ( '' !== $note ) {
+			$item['message'] .= ' ' . $note;
+		}
+
+		if ( $has_issues ) {
+			$state['issue_total']++;
+		}
+
+		$message = $item['message'];
+		unset( $item );
+
 		return array(
-			'finished' => true,
+			'complete' => false,
 			'error'    => false,
-			'message'  => __( 'Plugin verification completed.', 'k-integrity-guard' ),
-		);
-	}
-
-	/**
-	 * Verify a single plugin against WordPress.org checksums.
-	 *
-	 * @param array<string,mixed> $plugin Plugin payload.
-	 * @return array<string,mixed>|WP_Error
-	 */
-	private function scan_single_plugin( array $plugin ) {
-		$plugin_file = $plugin['plugin'] ?? '';
-		$slug        = $plugin['slug'] ?? '';
-		$version     = $plugin['version'] ?? '';
-		$name        = $plugin['name'] ?? $plugin_file;
-
-		if ( '' === $plugin_file || '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', 'k-integrity-guard' ) );
-		}
-
-		$checksums = $this->fetch_plugin_checksums( $slug, $version );
-		if ( is_wp_error( $checksums ) ) {
-			return $checksums;
-		}
-
-		$prefixes = array();
-		if ( '' !== $slug ) {
-			$prefixes[] = $slug;
-		}
-		$directory = dirname( $plugin_file );
-		if ( '.' !== $directory && '' !== $directory ) {
-			$prefixes[] = $directory;
-		}
-
-		$map = $this->normalize_checksum_map( $checksums['checksums'], $prefixes );
-		if ( empty( $map ) ) {
-			return new WP_Error( 'kig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', 'k-integrity-guard' ) );
-		}
-
-		$root_info    = $this->determine_plugin_root( $plugin_file, $slug );
-		$comparison   = $this->compare_extension_files( $root_info['root'], $map, $checksums['checksum_type'], $root_info['detect_added'] );
-		$has_issues   = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
-		$status       = $has_issues ? 'issues' : 'ok';
-		$message      = $has_issues
-			? sprintf(
-				/* translators: %s: Plugin name. */
-				__( 'Differences detected in plugin %s.', 'k-integrity-guard' ),
-				$name
-			)
-			: sprintf(
-				/* translators: %s: Plugin name. */
-				__( 'Plugin %s matches the official checksums.', 'k-integrity-guard' ),
-				$name
-			);
-
-		return array(
-			'status'   => $status,
 			'message'  => $message,
-			'modified' => $comparison['modified'],
-			'missing'  => $comparison['missing'],
-			'added'    => $comparison['added'],
-			'errors'   => $comparison['errors'],
 		);
 	}
 
 	/**
-	 * Finalise plugin verification state.
+	 * Summarize an extension target for the scan screen and history.
 	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return void
-	 */
-	private function finalize_plugins_target( array &$state ): void {
-		$issues = 0;
-		foreach ( $state['plugins'] ?? array() as $plugin ) {
-			if ( 'issues' === ( $plugin['status'] ?? '' ) ) {
-				$issues++;
-			}
-		}
-
-		$state['issue_total'] = $issues;
-		$state['processed']   = isset( $state['total'] ) ? (int) $state['total'] : (int) count( $state['plugins'] ?? array() );
-	}
-
-	/**
-	 * Summarize plugin verification results.
-	 *
-	 * @param array<string,mixed> $state Target state.
+	 * @param array<string,mixed>  $state  Target state.
+	 * @param array<string,string> $config Target configuration.
 	 * @return array<string,mixed>
 	 */
-	private function summarize_plugins_result( array $state ): array {
-		$order   = isset( $state['order'] ) && is_array( $state['order'] ) ? $state['order'] : array_keys( $state['plugins'] ?? array() );
-		$items   = array();
-		$plugins = $state['plugins'] ?? array();
+	private function summarize_extension_result( array $state, array $config ): array {
+		$items = array();
 
-		foreach ( $order as $key ) {
-			if ( empty( $plugins[ $key ] ) ) {
-				continue;
-			}
-
-			$data     = $plugins[ $key ];
+		foreach ( $state['items'] ?? array() as $key => $data ) {
 			$items[] = array(
-				'key'      => $key,
-				'name'     => $data['name'] ?? $key,
+				'key'      => (string) $key,
+				'name'     => $data['name'] ?? (string) $key,
 				'version'  => $data['version'] ?? '',
 				'status'   => $data['status'] ?? 'unknown',
 				'message'  => $data['message'] ?? '',
@@ -1431,95 +1353,70 @@ class KIG_Scan {
 			);
 		}
 
-		$skipped = array();
-		foreach ( $state['skipped'] ?? array() as $entry ) {
-			$skipped[] = array(
-				'key'    => $entry['plugin'] ?? '',
-				'name'   => $entry['name'] ?? '',
-				'reason' => $entry['reason'] ?? '',
-			);
-		}
-
-		$errors = array();
-		foreach ( $state['errors'] ?? array() as $entry ) {
-			$errors[] = array(
-				'key'     => $entry['plugin'] ?? '',
-				'name'    => $entry['name'] ?? '',
-				'message' => $entry['message'] ?? '',
-			);
-		}
-
-		$total   = (int) ( $state['total'] ?? count( $items ) );
-		$issues  = (int) ( $state['issue_total'] ?? 0 );
-		$skipped_count = count( $skipped );
-		$error_count   = count( $errors );
+		$skipped = $state['skipped'] ?? array();
+		$errors  = $state['errors'] ?? array();
 
 		return array(
 			'status'  => $state['status'] ?? 'unknown',
-			'summary' => $this->build_plugins_summary_message( $state ),
+			'summary' => $this->build_extension_summary_message( $state, $config ),
 			'items'   => $items,
 			'skipped' => $skipped,
 			'errors'  => $errors,
 			'totals'  => array(
-				'verified' => $total,
-				'issues'   => $issues,
-				'skipped'  => $skipped_count,
-				'errors'   => $error_count,
+				'verified' => (int) ( $state['total'] ?? count( $items ) ),
+				'issues'   => (int) ( $state['issue_total'] ?? 0 ),
+				'skipped'  => count( $skipped ),
+				'errors'   => count( $errors ),
 			),
 		);
 	}
 
 	/**
-	 * Build summary message for plugin verification results.
+	 * Build the summary message for an extension target.
 	 *
-	 * @param array<string,mixed> $state Target state.
+	 * @param array<string,mixed>  $state  Target state.
+	 * @param array<string,string> $config Target configuration.
 	 * @return string
 	 */
-	private function build_plugins_summary_message( array $state ): string {
-		$total        = (int) ( $state['total'] ?? 0 );
-		$issues       = (int) ( $state['issue_total'] ?? 0 );
-		$skipped      = is_array( $state['skipped'] ?? null ) ? count( $state['skipped'] ) : 0;
-		$error_count  = is_array( $state['errors'] ?? null ) ? count( $state['errors'] ) : 0;
+	private function build_extension_summary_message( array $state, array $config ): string {
+		$total   = (int) ( $state['total'] ?? 0 );
+		$issues  = (int) ( $state['issue_total'] ?? 0 );
+		$skipped = count( $state['skipped'] ?? array() );
+		$errors  = count( $state['errors'] ?? array() );
 
 		if ( 0 === $total ) {
-			if ( $skipped > 0 ) {
-				return __( 'No WordPress.org plugins were available for verification.', 'k-integrity-guard' );
-			}
-
-			return __( 'No plugins required verification.', 'k-integrity-guard' );
+			return $config['empty'];
 		}
 
-		if ( 0 === $issues && 0 === $error_count ) {
-			if ( $skipped > 0 ) {
-				return sprintf(
-					/* translators: %d: number of plugins. */
-					__( 'All WordPress.org plugins verified successfully. %d plugin(s) were skipped.', 'k-integrity-guard' ),
-					$skipped
-				);
-			}
-
-			return __( 'All WordPress.org plugins match the official checksums.', 'k-integrity-guard' );
+		if ( $issues > 0 ) {
+			$message = sprintf(
+				/* translators: 1: Scan target label, 2: items with differences, 3: total items. */
+				__( '%1$s: differences detected in %2$d of %3$d item(s).', 'k-integrity-guard' ),
+				$config['label'],
+				$issues,
+				$total
+			);
+		} else {
+			$message = sprintf(
+				/* translators: 1: Scan target label, 2: number of verified items. */
+				__( '%1$s: no differences detected in %2$d verified item(s).', 'k-integrity-guard' ),
+				$config['label'],
+				$total - $errors
+			);
 		}
 
-		$message = sprintf(
-			/* translators: 1: number of plugins with issues, 2: total verified. */
-			__( 'Integrity issues detected in %1$d plugin(s) out of %2$d verified.', 'k-integrity-guard' ),
-			$issues,
-			$total
-		);
-
-		if ( $error_count > 0 ) {
+		if ( $errors > 0 ) {
 			$message .= ' ' . sprintf(
-				/* translators: %d: number of plugins. */
-				__( '%d plugin(s) could not be verified.', 'k-integrity-guard' ),
-				$error_count
+				/* translators: %d: number of items. */
+				__( '%d item(s) could not be verified.', 'k-integrity-guard' ),
+				$errors
 			);
 		}
 
 		if ( $skipped > 0 ) {
 			$message .= ' ' . sprintf(
-				/* translators: %d: number of plugins. */
-				__( '%d plugin(s) were skipped.', 'k-integrity-guard' ),
+				/* translators: %d: number of items. */
+				__( '%d item(s) were skipped.', 'k-integrity-guard' ),
 				$skipped
 			);
 		}
@@ -1528,486 +1425,327 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Advance the theme scan state by one step.
+	 * Build a skipped-item entry.
 	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return array<string,mixed>
+	 * @param string $key    Plugin file or theme stylesheet.
+	 * @param string $name   Display name.
+	 * @param string $reason Why it was skipped.
+	 * @return array<string,string>
 	 */
-	private function advance_themes_target( array &$state ): array {
-		$status = $state['status'] ?? 'pending';
-
-		if ( 'pending' === $status ) {
-			$result = $this->prepare_themes_target( $state );
-
-			if ( is_wp_error( $result ) ) {
-				$state['status']  = 'error';
-				$state['message'] = $result->get_error_message();
-
-				return array(
-					'complete' => true,
-					'error'    => true,
-					'message'  => $state['message'],
-				);
-			}
-
-			if ( empty( $state['total'] ) ) {
-				$state['status']  = 'completed';
-				$state['message'] = __( 'No WordPress.org themes were available for verification.', 'k-integrity-guard' );
-
-				return array(
-					'complete' => true,
-					'error'    => false,
-					'message'  => $state['message'],
-				);
-			}
-
-			$state['status']  = 'processing';
-			$state['message'] = __( 'Preparing theme verification…', 'k-integrity-guard' );
-
-			return array(
-				'complete' => false,
-				'error'    => false,
-				'message'  => $state['message'],
-			);
-		}
-
-		if ( 'processing' === $status ) {
-			$result = $this->process_next_theme( $state );
-
-			if ( ! empty( $result['finished'] ) ) {
-				$this->finalize_themes_target( $state );
-				$state['status']  = 'completed';
-				$state['message'] = __( 'Theme verification completed.', 'k-integrity-guard' );
-
-				return array(
-					'complete' => true,
-					'error'    => ! empty( $state['errors'] ),
-					'message'  => $state['message'],
-				);
-			}
-
-			return array(
-				'complete' => false,
-				'error'    => ! empty( $result['error'] ),
-				'message'  => $result['message'],
-			);
-		}
-
+	private function skipped_entry( string $key, string $name, string $reason ): array {
 		return array(
-			'complete' => true,
-			'error'    => 'error' === $status,
-			'message'  => $state['message'] ?? '',
+			'key'    => $key,
+			'name'   => $name,
+			'reason' => $reason,
 		);
 	}
 
 	/**
-	 * Build theme scan metadata.
+	 * List WordPress.org plugins to verify against the official checksums.
 	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return true|WP_Error
+	 * @return array{items:array<string,array<string,string>>,skipped:array<int,array<string,string>>}
 	 */
-	private function prepare_themes_target( array &$state ) {
-		if ( ! class_exists( 'KIG_Utils' ) ) {
-			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', 'k-integrity-guard' ) );
-		}
-
-		$sources = KIG_Utils::detect_theme_sources();
-		$themes  = array();
-		$order   = array();
+	private function prepare_wporg_plugins(): array {
+		$items   = array();
 		$skipped = array();
 
-		foreach ( $sources as $stylesheet => $info ) {
+		foreach ( KIG_Utils::detect_plugin_sources() as $file => $info ) {
+			$name    = $this->sanitize_extension_label( (string) ( $info['name'] ?? $file ) );
+			$version = (string) ( $info['version'] ?? '' );
+			$slug    = (string) ( $info['slug'] ?? '' );
+
+			if ( empty( $info['is_wporg'] ) ) {
+				$skipped[] = $this->skipped_entry( $file, $name, __( 'Not available on WordPress.org.', 'k-integrity-guard' ) );
+			} elseif ( '' === $slug ) {
+				$skipped[] = $this->skipped_entry( $file, $name, __( 'Plugin slug could not be determined.', 'k-integrity-guard' ) );
+			} elseif ( '' === $version ) {
+				$skipped[] = $this->skipped_entry( $file, $name, __( 'Version could not be determined.', 'k-integrity-guard' ) );
+			} else {
+				$items[ $file ] = array(
+					'name'    => $name,
+					'version' => $version,
+					'slug'    => $slug,
+				);
+			}
+		}
+
+		return array(
+			'items'   => $items,
+			'skipped' => $skipped,
+		);
+	}
+
+	/**
+	 * List WordPress.org themes to verify against their local snapshots.
+	 *
+	 * WordPress.org publishes no theme checksums, so these themes need a snapshot like third-party themes.
+	 *
+	 * @return array{items:array<string,array<string,string>>,skipped:array<int,array<string,string>>}
+	 */
+	private function prepare_wporg_themes( array $state = array() ): array {
+		$options = $this->settings->get_options();
+		$ignores = $options['third_party_themes']['ignore'] ?? array();
+		$bundled = empty( $state['core_covers_bundled'] ) ? array() : $this->bundled_theme_slugs();
+		$items   = array();
+		$skipped = array();
+
+		foreach ( KIG_Utils::detect_theme_sources() as $stylesheet => $info ) {
 			$theme = wp_get_theme( $stylesheet );
 			if ( ! $theme->exists() ) {
 				continue;
 			}
 
-			$name     = $this->sanitize_extension_label( $theme->get( 'Name' ) );
-			$version  = (string) $theme->get( 'Version' );
-			$slug     = $stylesheet;
-			$is_wporg = ! empty( $info['is_wporg'] );
+			$name    = $this->sanitize_extension_label( (string) $theme->get( 'Name' ) );
+			$version = (string) $theme->get( 'Version' );
 
-			// Skip child themes - they inherit from parent themes.
 			if ( $theme->get( 'Template' ) ) {
-				$skipped[] = array(
-					'theme'  => $stylesheet,
-					'name'   => $name,
-					'reason' => __( 'Child theme - inherits from parent.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			// Skip WordPress default themes - already verified with core.
-			if ( in_array( $slug, self::WP_DEFAULT_THEMES, true ) ) {
-				$skipped[] = array(
-					'theme'  => $stylesheet,
-					'name'   => $name,
-					'reason' => __( 'Default WordPress theme - verified with core scan.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			// Skip non-WordPress.org themes.
-			if ( ! $is_wporg ) {
-				$skipped[] = array(
-					'theme'  => $stylesheet,
-					'name'   => $name,
-					'reason' => __( 'Not available on WordPress.org.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			if ( '' === $version ) {
-				$skipped[] = array(
-					'theme'  => $stylesheet,
-					'name'   => $name,
-					'reason' => __( 'Theme version could not be determined.', 'k-integrity-guard' ),
-				);
-				continue;
-			}
-
-			$themes[ $stylesheet ] = array(
-				'stylesheet' => $stylesheet,
-				'name'       => $name,
-				'slug'       => $slug,
-				'version'    => $version,
-				'status'     => 'pending',
-				'modified'   => array(),
-				'missing'    => array(),
-				'added'      => array(),
-				'errors'     => array(),
-			);
-
-			$order[] = $stylesheet;
-		}
-
-		$state['themes']     = $themes;
-		$state['order']      = $order;
-		$state['skipped']    = $skipped;
-		$state['errors']     = array();
-		$state['processed']  = 0;
-		$state['total']      = count( $order );
-		$state['issue_total'] = 0;
-
-		return true;
-	}
-
-	/**
-	 * Process the next theme pending verification.
-	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return array<string,mixed>
-	 */
-	private function process_next_theme( array &$state ): array {
-		$order = $state['order'] ?? array();
-		$total = max( 1, (int) ( $state['total'] ?? count( $order ) ) );
-
-		foreach ( $order as $index => $key ) {
-			if ( empty( $state['themes'][ $key ] ) ) {
-				continue;
-			}
-
-			$theme = &$state['themes'][ $key ];
-			if ( 'pending' !== ( $theme['status'] ?? 'pending' ) ) {
-				unset( $theme );
-				continue;
-			}
-
-			$result = $this->scan_single_theme( $theme );
-			$state['processed'] = (int) ( $state['processed'] ?? 0 ) + 1;
-
-			if ( is_wp_error( $result ) ) {
-				$error_message   = $result->get_error_message();
-				$theme['status']  = 'error';
-				$theme['message'] = $error_message;
-				$state['errors'][] = array(
-					'theme'   => $key,
-					'name'    => $theme['name'] ?? $key,
-					'message' => $error_message,
-				);
-
-				$message = sprintf(
-					/* translators: %s: Theme name. */
-					__( 'Verification failed for theme %s.', 'k-integrity-guard' ),
-					$theme['name'] ?? $key
-				);
-
-				unset( $theme );
-
-				return array(
-					'finished' => false,
-					'error'    => true,
-					'message'  => $message,
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Child theme - inherits from parent.', 'k-integrity-guard' ) );
+			} elseif ( in_array( $stylesheet, $bundled, true ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Ships with WordPress - checked by the core scan.', 'k-integrity-guard' ) );
+			} elseif ( empty( $info['is_wporg'] ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Not available on WordPress.org.', 'k-integrity-guard' ) );
+			} elseif ( ! empty( $ignores[ $stylesheet ] ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Ignored by user.', 'k-integrity-guard' ) );
+			} elseif ( null === KIG_Utils::read_theme_checksum_json( $stylesheet ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'WordPress.org does not publish theme checksums. Generate a snapshot in Settings.', 'k-integrity-guard' ) );
+			} else {
+				$items[ $stylesheet ] = array(
+					'name'    => $name,
+					'version' => $version,
 				);
 			}
-
-			$theme['modified'] = $result['modified'];
-			$theme['missing']  = $result['missing'];
-			$theme['added']    = $result['added'];
-			$theme['errors']   = $result['errors'];
-			$theme['status']   = $result['status'];
-			$theme['message']  = $result['message'];
-
-			if ( 'issues' === $result['status'] ) {
-				$state['issue_total'] = (int) ( $state['issue_total'] ?? 0 ) + 1;
-			}
-
-			$message = sprintf(
-				/* translators: 1: theme name, 2: current position, 3: total. */
-				__( 'Checked theme %1$s (%2$d of %3$d).', 'k-integrity-guard' ),
-				$theme['name'] ?? $key,
-				$index + 1,
-				$total
-			);
-
-			if ( ! empty( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-
-			unset( $theme );
-
-			return array(
-				'finished' => false,
-				'error'    => false,
-				'message'  => $message,
-			);
 		}
 
 		return array(
-			'finished' => true,
-			'error'    => false,
-			'message'  => __( 'Theme verification completed.', 'k-integrity-guard' ),
+			'items'   => $items,
+			'skipped' => $skipped,
 		);
 	}
 
 	/**
-	 * Verify a single theme against WordPress.org checksums.
+	 * List third-party plugins to verify against their local snapshots.
 	 *
-	 * @param array<string,mixed> $theme Theme payload.
-	 * @return array<string,mixed>|WP_Error
+	 * @return array{items:array<string,array<string,string>>,skipped:array<int,array<string,string>>}
 	 */
-	private function scan_single_theme( array $theme ) {
-		$stylesheet = $theme['stylesheet'] ?? '';
-		$slug       = $theme['slug'] ?? '';
-		$version    = $theme['version'] ?? '';
-		$name       = $theme['name'] ?? $stylesheet;
+	private function prepare_third_party_plugins(): array {
+		$options = $this->settings->get_options();
+		$ignores = $options['third_party']['ignore'] ?? array();
+		$items   = array();
+		$skipped = array();
 
-		if ( '' === $stylesheet || '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_theme_data', __( 'Insufficient data to verify theme.', 'k-integrity-guard' ) );
+		foreach ( KIG_Utils::detect_plugin_sources() as $file => $info ) {
+			if ( ! empty( $info['is_wporg'] ) ) {
+				continue;
+			}
+
+			$name = $this->sanitize_extension_label( (string) ( $info['name'] ?? $file ) );
+
+			if ( ! empty( $ignores[ $file ] ) ) {
+				$skipped[] = $this->skipped_entry( $file, $name, __( 'Ignored by user.', 'k-integrity-guard' ) );
+			} elseif ( null === KIG_Utils::read_plugin_checksum_json( $file ) ) {
+				$skipped[] = $this->skipped_entry( $file, $name, __( 'No snapshot available. Generate one in Settings.', 'k-integrity-guard' ) );
+			} else {
+				$items[ $file ] = array(
+					'name'    => $name,
+					'version' => (string) ( $info['version'] ?? '' ),
+				);
+			}
 		}
 
-		$theme_obj = wp_get_theme( $stylesheet );
-		if ( ! $theme_obj->exists() ) {
-			return new WP_Error( 'kig_theme_missing', __( 'Theme is not installed.', 'k-integrity-guard' ) );
+		return array(
+			'items'   => $items,
+			'skipped' => $skipped,
+		);
+	}
+
+	/**
+	 * Core checksums for the installed WordPress version (cached for a day by fetch_core_checksums()).
+	 *
+	 * @return array<string,string> Empty when they are unavailable.
+	 */
+	private function core_checksums(): array {
+		$locale    = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+		$checksums = $this->fetch_core_checksums( get_bloginfo( 'version' ), $locale );
+
+		return is_wp_error( $checksums ) ? array() : $checksums['checksums'];
+	}
+
+	/**
+	 * Slugs of the default themes that ship with the installed WordPress version (from the cached core checksums).
+	 *
+	 * @return array<int,string> Empty when the core checksums are unavailable.
+	 */
+	private function bundled_theme_slugs(): array {
+		$slugs = array();
+		foreach ( array_keys( $this->core_checksums() ) as $path ) {
+			$dir = $this->resolve_core_theme_directory( (string) $path );
+			if ( null !== $dir ) {
+				$slugs[ substr( $dir, strlen( 'wp-content/themes/' ) ) ] = true;
+			}
 		}
 
-		$root = $theme_obj->get_stylesheet_directory();
-		if ( ! $root || ! is_dir( $root ) ) {
-			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', 'k-integrity-guard' ) );
+		return array_keys( $slugs );
+	}
+
+	/**
+	 * List third-party themes to verify against their local snapshots.
+	 *
+	 * @return array{items:array<string,array<string,string>>,skipped:array<int,array<string,string>>}
+	 */
+	private function prepare_third_party_themes(): array {
+		$options = $this->settings->get_options();
+		$ignores = $options['third_party_themes']['ignore'] ?? array();
+		$items   = array();
+		$skipped = array();
+
+		foreach ( KIG_Utils::detect_theme_sources() as $stylesheet => $info ) {
+			if ( ! empty( $info['is_wporg'] ) ) {
+				continue;
+			}
+
+			$name = $this->sanitize_extension_label( (string) ( $info['name'] ?? $stylesheet ) );
+
+			if ( ! empty( $ignores[ $stylesheet ] ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'Ignored by user.', 'k-integrity-guard' ) );
+			} elseif ( null === KIG_Utils::read_theme_checksum_json( $stylesheet ) ) {
+				$skipped[] = $this->skipped_entry( $stylesheet, $name, __( 'No snapshot available. Generate one in Settings.', 'k-integrity-guard' ) );
+			} else {
+				$items[ $stylesheet ] = array(
+					'name'    => $name,
+					'version' => (string) ( $info['version'] ?? '' ),
+				);
+			}
 		}
 
-		$checksums = $this->fetch_theme_checksums( $slug, $version );
+		return array(
+			'items'   => $items,
+			'skipped' => $skipped,
+		);
+	}
+
+	/**
+	 * Verify a WordPress.org plugin against the official checksums.
+	 *
+	 * @param array<string,mixed> $item Item with key (plugin file), slug and version.
+	 * @return array<string,mixed>|WP_Error Comparison result.
+	 */
+	private function verify_wporg_plugin( array $item ) {
+		$checksums = $this->fetch_plugin_checksums( $item['slug'], $item['version'] );
 		if ( is_wp_error( $checksums ) ) {
 			return $checksums;
 		}
 
-		$map = $this->normalize_checksum_map( $checksums['checksums'], array( $slug ) );
+		$prefixes  = array( $item['slug'] );
+		$directory = dirname( $item['key'] );
+		if ( '.' !== $directory && '' !== $directory ) {
+			$prefixes[] = $directory;
+		}
+
+		$map = $this->normalize_checksum_map( $checksums['checksums'], $prefixes );
+
+		// A single-file plugin (e.g. Hello Dolly) is installed without its readme: check only its own file.
+		// WordPress ships its own copy of some of these, so the core checksum for that file is valid too.
+		if ( '.' === $directory || '' === $directory ) {
+			$file = basename( $item['key'] );
+			$map  = array_intersect_key( $map, array( $file => true ) );
+			$core = $this->core_checksums()[ 'wp-content/plugins/' . $file ] ?? null;
+			if ( isset( $map[ $file ] ) && null !== $core ) {
+				$map[ $file ] = array_merge( (array) $map[ $file ], array( (string) $core ) );
+			}
+		}
+
 		if ( empty( $map ) ) {
-			return new WP_Error( 'kig_missing_theme_checksums', __( 'Theme checksums were not provided.', 'k-integrity-guard' ) );
+			return new WP_Error( 'kig_missing_plugin_checksums', __( 'Plugin checksums were not provided.', 'k-integrity-guard' ) );
 		}
 
-		$comparison = $this->compare_extension_files( $root, $map, $checksums['checksum_type'], true );
-		$has_issues = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
-		$status     = $has_issues ? 'issues' : 'ok';
-		$message    = $has_issues
-			? sprintf(
-				/* translators: %s: Theme name. */
-				__( 'Differences detected in theme %s.', 'k-integrity-guard' ),
-				$name
-			)
-			: sprintf(
-				/* translators: %s: Theme name. */
-				__( 'Theme %s matches the official checksums.', 'k-integrity-guard' ),
-				$name
-			);
+		$root_info = $this->determine_plugin_root( $item['key'], $item['slug'] );
 
-		return array(
-			'status'   => $status,
-			'message'  => $message,
-			'modified' => $comparison['modified'],
-			'missing'  => $comparison['missing'],
-			'added'    => $comparison['added'],
-			'errors'   => $comparison['errors'],
-		);
+		return $this->compare_extension_files( $root_info['root'], $map, $checksums['checksum_type'], $root_info['detect_added'] );
 	}
 
 	/**
-	 * Finalise theme verification state.
+	 * Verify a third-party plugin against its local snapshot.
 	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return void
+	 * @param array<string,mixed> $item Item with key (plugin file) and version.
+	 * @return array<string,mixed>|WP_Error Comparison result.
 	 */
-	private function finalize_themes_target( array &$state ): void {
-		$issues = 0;
-		foreach ( $state['themes'] ?? array() as $theme ) {
-			if ( 'issues' === ( $theme['status'] ?? '' ) ) {
-				$issues++;
-			}
-		}
+	private function verify_third_party_plugin( array $item ) {
+		$base     = dirname( $item['key'] );
+		$snapshot = KIG_Utils::read_plugin_checksum_json( $item['key'] );
 
-		$state['issue_total'] = $issues;
-		$state['processed']   = isset( $state['total'] ) ? (int) $state['total'] : (int) count( $state['themes'] ?? array() );
-	}
-
-	/**
-	 * Summarize theme verification results.
-	 *
-	 * @param array<string,mixed> $state Target state.
-	 * @return array<string,mixed>
-	 */
-	private function summarize_themes_result( array $state ): array {
-		$order  = isset( $state['order'] ) && is_array( $state['order'] ) ? $state['order'] : array_keys( $state['themes'] ?? array() );
-		$themes = $state['themes'] ?? array();
-		$items  = array();
-
-		foreach ( $order as $key ) {
-			if ( empty( $themes[ $key ] ) ) {
-				continue;
+		if ( '.' === $base || '' === $base ) {
+			// Single-file plugin: check only its own file. Older snapshots hashed the whole plugins folder, so filter them too.
+			if ( is_array( $snapshot ) && is_array( $snapshot['files'] ?? null ) ) {
+				$snapshot['files'] = array_intersect_key( $snapshot['files'], array( $item['key'] => true ) );
 			}
 
-			$data     = $themes[ $key ];
-			$items[] = array(
-				'key'      => $key,
-				'name'     => $data['name'] ?? $key,
-				'version'  => $data['version'] ?? '',
-				'status'   => $data['status'] ?? 'unknown',
-				'message'  => $data['message'] ?? '',
-				'modified' => $data['modified'] ?? array(),
-				'missing'  => $data['missing'] ?? array(),
-				'added'    => $data['added'] ?? array(),
-				'errors'   => $data['errors'] ?? array(),
-			);
+			return $this->compare_with_snapshot( $snapshot, WP_PLUGIN_DIR, $item['version'], false );
 		}
 
-		$skipped = array();
-		foreach ( $state['skipped'] ?? array() as $entry ) {
-			$skipped[] = array(
-				'key'    => $entry['theme'] ?? '',
-				'name'   => $entry['name'] ?? '',
-				'reason' => $entry['reason'] ?? '',
-			);
+		$root = trailingslashit( WP_PLUGIN_DIR ) . $base;
+		if ( ! is_dir( $root ) ) {
+			return new WP_Error( 'kig_plugin_path', __( 'Plugin directory could not be located.', 'k-integrity-guard' ) );
 		}
 
-		$errors = array();
-		foreach ( $state['errors'] ?? array() as $entry ) {
-			$errors[] = array(
-				'key'     => $entry['theme'] ?? '',
-				'name'    => $entry['name'] ?? '',
-				'message' => $entry['message'] ?? '',
-			);
-		}
-
-		$total   = (int) ( $state['total'] ?? count( $items ) );
-		$issues  = (int) ( $state['issue_total'] ?? 0 );
-		$skipped_count = count( $skipped );
-		$error_count   = count( $errors );
-
-		return array(
-			'status'  => $state['status'] ?? 'unknown',
-			'summary' => $this->build_themes_summary_message( $state ),
-			'items'   => $items,
-			'skipped' => $skipped,
-			'errors'  => $errors,
-			'totals'  => array(
-				'verified' => $total,
-				'issues'   => $issues,
-				'skipped'  => $skipped_count,
-				'errors'   => $error_count,
-			),
-		);
+		return $this->compare_with_snapshot( $snapshot, $root, $item['version'] );
 	}
 
 	/**
-	 * Build summary message for theme verification results.
+	 * Verify a theme against its local snapshot.
 	 *
-	 * @param array<string,mixed> $state Target state.
-	 * @return string
-	 */
-	private function build_themes_summary_message( array $state ): string {
-		$total        = (int) ( $state['total'] ?? 0 );
-		$issues       = (int) ( $state['issue_total'] ?? 0 );
-		$skipped      = is_array( $state['skipped'] ?? null ) ? count( $state['skipped'] ) : 0;
-		$error_count  = is_array( $state['errors'] ?? null ) ? count( $state['errors'] ) : 0;
-
-		if ( 0 === $total ) {
-			if ( $skipped > 0 ) {
-				return __( 'No WordPress.org themes were available for verification.', 'k-integrity-guard' );
-			}
-
-			return __( 'No themes required verification.', 'k-integrity-guard' );
-		}
-
-		if ( 0 === $issues && 0 === $error_count ) {
-			if ( $skipped > 0 ) {
-				return sprintf(
-					/* translators: %d: number of themes. */
-					__( 'All WordPress.org themes verified successfully. %d theme(s) were skipped.', 'k-integrity-guard' ),
-					$skipped
-				);
-			}
-
-			return __( 'All WordPress.org themes match the official checksums.', 'k-integrity-guard' );
-		}
-
-		$message = sprintf(
-			/* translators: 1: number of themes with issues, 2: total verified. */
-			__( 'Integrity issues detected in %1$d theme(s) out of %2$d verified.', 'k-integrity-guard' ),
-			$issues,
-			$total
-		);
-
-		if ( $error_count > 0 ) {
-			$message .= ' ' . sprintf(
-				/* translators: %d: number of themes. */
-				__( '%d theme(s) could not be verified.', 'k-integrity-guard' ),
-				$error_count
-			);
-		}
-
-		if ( $skipped > 0 ) {
-			$message .= ' ' . sprintf(
-				/* translators: %d: number of themes. */
-				__( '%d theme(s) were skipped.', 'k-integrity-guard' ),
-				$skipped
-			);
-		}
-
-		return $message;
-	}
-
-	/**
-	 * Retrieve plugin checksums from WordPress.org.
+	 * Used for WordPress.org themes too: WordPress.org publishes no theme checksums.
 	 *
-	 * @param string $slug    Plugin slug.
-	 * @param string $version Plugin version.
-	 * @return array<string,mixed>|WP_Error
+	 * @param array<string,mixed> $item Item with key (stylesheet) and version.
+	 * @return array<string,mixed>|WP_Error Comparison result.
 	 */
-	private function fetch_plugin_checksums( string $slug, string $version ) {
-		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_plugin_checksum_args', __( 'Invalid plugin checksum request.', 'k-integrity-guard' ) );
+	private function verify_theme_snapshot( array $item ) {
+		$root = wp_get_theme( $item['key'] )->get_stylesheet_directory();
+		if ( ! $root || ! is_dir( $root ) ) {
+			return new WP_Error( 'kig_theme_path', __( 'Theme directory could not be located.', 'k-integrity-guard' ) );
 		}
 
-		return $this->fetch_plugin_checksums_from_downloads( $slug, $version );
+		return $this->compare_with_snapshot( KIG_Utils::read_theme_checksum_json( $item['key'] ), $root, $item['version'] );
 	}
 
 	/**
-	 * Retrieve plugin checksums via downloads.wordpress.org endpoint.
+	 * Compare files against a local snapshot.
+	 *
+	 * A version change since the snapshot is always reported, so bumping the Version header cannot hide changes.
+	 *
+	 * @param array<string,mixed>|null $snapshot Snapshot data (version, algorithm, files).
+	 * @param string                   $root     Directory to compare.
+	 * @param string                   $version  Installed version.
+	 * @param bool                     $detect_added Whether to report files not in the snapshot.
+	 * @return array<string,mixed>|WP_Error Comparison result, with a 'note' when the version changed.
+	 */
+	private function compare_with_snapshot( $snapshot, string $root, string $version, bool $detect_added = true ) {
+		if ( ! is_array( $snapshot ) || empty( $snapshot['files'] ) || ! is_array( $snapshot['files'] ) ) {
+			return new WP_Error( 'kig_no_checksum', __( 'No checksum snapshot available.', 'k-integrity-guard' ) );
+		}
+
+		$result           = $this->compare_extension_files( $root, $snapshot['files'], (string) ( $snapshot['algorithm'] ?? 'md5' ), $detect_added );
+		$snapshot_version = (string) ( $snapshot['version'] ?? '' );
+
+		if ( $snapshot_version !== $version ) {
+			$result['note'] = sprintf(
+				/* translators: 1: snapshot version, 2: installed version. */
+				__( 'Version changed since snapshot (%1$s to %2$s).', 'k-integrity-guard' ),
+				$snapshot_version,
+				$version
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Retrieve plugin checksums from downloads.wordpress.org.
 	 *
 	 * @param string $slug Plugin slug.
 	 * @param string $version Plugin version.
 	 * @return array<string,mixed>|WP_Error
 	 */
-	private function fetch_plugin_checksums_from_downloads( string $slug, string $version ) {
+	private function fetch_plugin_checksums( string $slug, string $version ) {
 		$url     = sprintf( 'https://downloads.wordpress.org/plugin-checksums/%1$s/%2$s.json', rawurlencode( $slug ), rawurlencode( $version ) );
 		$request = wp_remote_get(
 			$url,
@@ -2048,69 +1786,6 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Retrieve theme checksums from WordPress.org.
-	 *
-	 * @param string $slug    Theme slug (stylesheet).
-	 * @param string $version Theme version.
-	 * @return array<string,mixed>|WP_Error
-	 */
-	private function fetch_theme_checksums( string $slug, string $version ) {
-		if ( '' === $slug || '' === $version ) {
-			return new WP_Error( 'kig_theme_checksum_args', __( 'Invalid theme checksum request.', 'k-integrity-guard' ) );
-		}
-
-		$url = sprintf( 'https://api.wordpress.org/themes/checksums/1.0/%1$s/%2$s', rawurlencode( $slug ), rawurlencode( $version ) );
-		$url = add_query_arg(
-			array(
-				'locale' => $this->determine_request_locale(),
-			),
-			$url
-		);
-
-		$request = wp_remote_get(
-			$url,
-			array(
-				'timeout'   => 20,
-				'user-agent' => 'K\'Integrity Guard/' . $this->version,
-			)
-		);
-
-		if ( is_wp_error( $request ) ) {
-			return $request;
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $request );
-		if ( 200 !== $code ) {
-			return new WP_Error( 'kig_theme_checksum_http', __( 'Unable to download theme checksums.', 'k-integrity-guard' ) );
-		}
-
-		$body = wp_remote_retrieve_body( $request );
-		$data = json_decode( $body, true );
-
-		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'kig_theme_checksum_json', __( 'Unexpected theme checksum response.', 'k-integrity-guard' ) );
-		}
-
-		if ( empty( $data['checksums'] ) || ! is_array( $data['checksums'] ) ) {
-			if ( isset( $data['error'] ) && is_string( $data['error'] ) ) {
-				return new WP_Error( 'kig_theme_checksum_error', $data['error'] );
-			}
-
-			return new WP_Error( 'kig_theme_checksum_missing', __( 'Theme checksums were not provided by WordPress.org.', 'k-integrity-guard' ) );
-		}
-
-		$type = isset( $data['checksum_type'] ) ? strtolower( (string) $data['checksum_type'] ) : 'md5';
-		if ( ! in_array( $type, array( 'md5', 'sha256' ), true ) ) {
-			$type = 'md5';
-		}
-
-		return array(
-			'checksums'      => $data['checksums'],
-			'checksum_type'  => $type,
-		);
-	}
-
-	/**
 	 * Normalize checksum map keys to relative paths.
 	 *
 	 * @param array<mixed> $checksums Raw checksum map.
@@ -2140,7 +1815,8 @@ class KIG_Scan {
 				}
 			}
 
-			$normalized[ $relative ] = (string) $hash;
+			// WordPress.org plugin checksums give {"md5": "<hash>" or ["<hash>", ...], "sha256": ...} per file.
+			$normalized[ $relative ] = is_array( $hash ) ? (array) ( $hash['md5'] ?? array() ) : (string) $hash;
 		}
 
 		return $normalized;
@@ -2163,9 +1839,11 @@ class KIG_Scan {
 		$added       = array();
 		$algorithm   = in_array( strtolower( $algorithm ), array( 'md5', 'sha256' ), true ) ? strtolower( $algorithm ) : 'md5';
 
-		foreach ( $checksums as $relative => $expected ) {
+		foreach ( $checksums as $relative => $valid ) {
 			$relative = ltrim( wp_normalize_path( (string) $relative ), '/' );
-			$expected = (string) $expected;
+			// One hash, or a list when several versions of a file are valid (WordPress.org plugin checksums).
+			$valid    = array_map( 'strtolower', array_map( 'strval', (array) $valid ) );
+			$expected = implode( ' / ', $valid );
 			$full     = $root . '/' . $relative;
 
 			if ( ! file_exists( $full ) ) {
@@ -2200,7 +1878,7 @@ class KIG_Scan {
 				continue;
 			}
 
-			if ( strtolower( $actual ) !== strtolower( $expected ) ) {
+			if ( ! in_array( strtolower( $actual ), $valid, true ) ) {
 				$modified[] = array(
 					'file'     => $relative,
 					'expected' => $expected,
@@ -2322,19 +2000,6 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Determine the locale to request from the WordPress.org APIs.
-	 *
-	 * @return string
-	 */
-	private function determine_request_locale(): string {
-		if ( function_exists( 'determine_locale' ) ) {
-			return (string) determine_locale();
-		}
-
-		return (string) get_locale();
-	}
-
-	/**
 	 * Determine overall job progress percentage.
 	 *
 	 * @param array<string,mixed> $job Job state.
@@ -2390,45 +2055,27 @@ class KIG_Scan {
 
 		update_option( self::OPTION_LAST_RESULT, $payload, false );
 
-		// Calculate total issues from all targets.
+		// Total issues is the number of affected files (modified + missing + added) across all items.
 		$total_issues = 0;
 		$has_errors   = false;
 		$has_warnings = false;
 
-		foreach ( $job['results'] ?? array() as $target => $result ) {
-			// Count issues from summary totals if available.
-			if ( isset( $result['totals']['issues'] ) ) {
-				$total_issues += (int) $result['totals']['issues'];
-			}
-
-			// Check for items with issues.
-			if ( ! empty( $result['items'] ) ) {
-				foreach ( $result['items'] as $item ) {
-					if ( 'issues' === ( $item['status'] ?? '' ) ) {
-						$has_warnings = true;
-						// Count file-level issues.
-						if ( ! empty( $item['modified'] ) ) {
-							$total_issues += count( $item['modified'] );
-						}
-						if ( ! empty( $item['missing'] ) ) {
-							$total_issues += count( $item['missing'] );
-						}
-						if ( ! empty( $item['added'] ) ) {
-							$total_issues += count( $item['added'] );
-						}
-					} elseif ( 'error' === ( $item['status'] ?? '' ) ) {
-						$has_errors = true;
-					}
-				}
-			}
-
-			// Check for errors at target level.
-			if ( ! empty( $result['errors'] ) ) {
+		foreach ( $job['results'] ?? array() as $result ) {
+			if ( 'error' === ( $result['status'] ?? '' ) || ! empty( $result['errors'] ) ) {
 				$has_errors = true;
+			}
+
+			foreach ( $result['items'] ?? array() as $item ) {
+				$total_issues += count( $item['modified'] ?? array() ) + count( $item['missing'] ?? array() ) + count( $item['added'] ?? array() );
+
+				if ( 'error' === ( $item['status'] ?? '' ) ) {
+					$has_errors = true;
+				} elseif ( 'issues' === ( $item['status'] ?? '' ) ) {
+					$has_warnings = true;
+				}
 			}
 		}
 
-		// Determine overall status.
 		$status = 'success';
 		if ( $has_errors ) {
 			$status = 'error';
@@ -2496,52 +2143,47 @@ class KIG_Scan {
 	}
 
 	/**
-	 * Build a list of core files excluding user directories.
+	 * List installed core files for unexpected-file detection.
 	 *
+	 * Walks only root-level files of ABSPATH, wp-admin/, wp-includes/ and the allowed bundled theme folders.
+	 * In the root only PHP-type files are listed: sites keep their own .htaccess, robots.txt, favicon etc. there,
+	 * and only executable files are a tampering risk.
+	 *
+	 * @param array<int,string> $allowed_theme_dirs Allowed bundled theme paths relative to ABSPATH.
 	 * @return array<int,string>
 	 */
 	private function list_core_files( array $allowed_theme_dirs = array() ): array {
 		$files = array();
 		$root  = wp_normalize_path( trailingslashit( ABSPATH ) );
-		$base  = strlen( $root );
 
-		$directory = new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS );
-		$filter    = new RecursiveCallbackFilterIterator(
-			$directory,
-			function ( SplFileInfo $current ) use ( $root, $base, $allowed_theme_dirs ) {
-				$path = wp_normalize_path( $current->getPathname() );
-				$rel  = ltrim( substr( $path, $base ), '/' );
-
-				if ( '' === $rel ) {
-					return true;
-				}
-
-				if ( $current->isDir() ) {
-					return ! $this->is_core_path_excluded( $rel, $allowed_theme_dirs );
-				}
-
-				return ! $this->is_core_path_excluded( $rel, $allowed_theme_dirs );
+		foreach ( new DirectoryIterator( $root ) as $entry ) {
+			if ( $entry->isFile() && self::is_executable_name( $entry->getFilename() ) && ! $this->is_core_path_excluded( $entry->getFilename() ) ) {
+				$files[] = $entry->getFilename();
 			}
-		);
+		}
 
-		$iterator = new RecursiveIteratorIterator( $filter );
-
-		foreach ( $iterator as $file ) {
-			if ( ! $file->isFile() ) {
+		foreach ( array_merge( array( 'wp-admin', 'wp-includes' ), $allowed_theme_dirs ) as $dir ) {
+			// Skips file entries such as wp-content/themes/index.php.
+			if ( ! is_dir( $root . $dir ) ) {
 				continue;
 			}
 
-			$path = wp_normalize_path( $file->getPathname() );
-			$rel  = ltrim( substr( $path, $base ), '/' );
-
-			if ( '' === $rel || $this->is_core_path_excluded( $rel, $allowed_theme_dirs ) ) {
-				continue;
+			foreach ( $this->list_directory_files( $root . $dir ) as $relative ) {
+				$files[] = $dir . '/' . $relative;
 			}
-
-			$files[] = $rel;
 		}
 
 		return $files;
+	}
+
+	/**
+	 * Whether a file name is one PHP may execute (.php, .php7, .phtml, .phar ...).
+	 *
+	 * @param string $name File name.
+	 * @return bool
+	 */
+	private static function is_executable_name( string $name ): bool {
+		return 1 === preg_match( '/\.(php\d*|phtml|phar|phps)$/i', $name );
 	}
 
 	/**
@@ -2550,474 +2192,20 @@ class KIG_Scan {
 	 * @param string $path Relative path from ABSPATH.
 	 * @return bool
 	 */
-	private function is_core_path_excluded( string $path, array $allowed_theme_dirs = array() ): bool {
-		$normalized = ltrim( wp_normalize_path( $path ), '/' );
-		$normalized = untrailingslashit( $normalized );
+	private function is_core_path_excluded( string $path ): bool {
+		$normalized = untrailingslashit( ltrim( wp_normalize_path( $path ), '/' ) );
 
-		foreach ( self::CORE_EXCLUDED_FILES as $file ) {
-			if ( $normalized === $file ) {
-				if ( ! empty( $allowed_theme_dirs ) && $this->is_allowed_theme_path( $normalized, $allowed_theme_dirs ) ) {
-					continue;
-				}
-
-				return true;
-			}
+		if ( in_array( $normalized, self::CORE_EXCLUDED_FILES, true ) ) {
+			return true;
 		}
 
 		foreach ( self::CORE_EXCLUDED_PREFIXES as $prefix ) {
-			$prefix = trim( wp_normalize_path( $prefix ), '/' );
-			if ( '' === $prefix ) {
-				continue;
-			}
-
-			$prefix = untrailingslashit( $prefix );
-
-			if ( 0 === strpos( $normalized, $prefix ) ) {
-				if ( 'wp-content/themes' === $prefix && ! empty( $allowed_theme_dirs ) ) {
-					if ( $this->is_allowed_theme_path( $normalized, $allowed_theme_dirs ) ) {
-						continue;
-					}
-				}
-
-				$remainder = substr( $normalized, strlen( $prefix ) );
-				if ( '' === $remainder || '/' === $remainder[0] ) {
-					return true;
-				}
+			if ( $normalized === $prefix || 0 === strpos( $normalized, $prefix . '/' ) ) {
+				return true;
 			}
 		}
 
 		return false;
 	}
 
-
-
-	/**
-	 * Advance the third-party plugin scan state by one step.
-	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return array<string,mixed>
-	 */
-	private function advance_third_party_plugins_target( array &$state ): array {
-		$status = $state['status'] ?? 'pending';
-
-		if ( 'pending' === $status ) {
-			$result = $this->prepare_third_party_plugins_target( $state );
-
-			if ( is_wp_error( $result ) ) {
-				$state['status']  = 'error';
-				$state['message'] = $result->get_error_message();
-
-				return array(
-'complete' => true,
-					'error'    => true,
-					'message'  => $state['message'],
-				);
-			}
-
-			if ( empty( $state['total'] ) ) {
-				$state['status']  = 'completed';
-				$state['message'] = __( 'No third-party plugins with snapshots were available for verification.', 'k-integrity-guard' );
-
-				return array(
-'complete' => true,
-					'error'    => false,
-					'message'  => $state['message'],
-				);
-			}
-
-			$state['status']  = 'processing';
-			$state['message'] = __( 'Preparing third-party plugin verification…', 'k-integrity-guard' );
-
-			return array(
-'complete' => false,
-				'error'    => false,
-				'message'  => $state['message'],
-			);
-		}
-
-		if ( 'processing' === $status ) {
-			$result = $this->process_next_third_party_plugin( $state );
-
-			if ( ! empty( $result['finished'] ) ) {
-				$this->finalize_third_party_plugins_target( $state );
-				$state['status']  = 'completed';
-				$state['message'] = __( 'Third-party plugin verification completed.', 'k-integrity-guard' );
-
-				return array(
-'complete' => true,
-					'error'    => ! empty( $state['errors'] ),
-					'message'  => $state['message'],
-				);
-			}
-
-			return array(
-'complete' => false,
-				'error'    => ! empty( $result['error'] ),
-				'message'  => $result['message'],
-			);
-		}
-
-		return array(
-'complete' => true,
-			'error'    => 'error' === $status,
-			'message'  => $state['message'] ?? '',
-		);
-	}
-
-	/**
-	 * Build third-party plugin scan metadata.
-	 *
-	 * @param array<string,mixed> $state Target state (passed by reference).
-	 * @return true|WP_Error
-	 */
-	private function prepare_third_party_plugins_target( array &$state ) {
-		if ( ! class_exists( 'KIG_Utils' ) ) {
-			return new WP_Error( 'kig_missing_utils', __( 'Utility class is unavailable.', 'k-integrity-guard' ) );
-		}
-
-		$sources  = KIG_Utils::detect_plugin_sources();
-		$settings = $this->settings->get_options();
-		$ignores  = $settings['third_party']['ignore'] ?? array();
-		$plugins  = array();
-		$order    = array();
-		$skipped  = array();
-
-		foreach ( $sources as $plugin_file => $info ) {
-			// Skip WordPress.org plugins - they're scanned in the 'plugins' target.
-if ( ! empty( $info['is_wporg'] ) ) {
-continue;
-}
-
-$name = $this->sanitize_extension_label( $info['name'] );
-
-// Skip ignored plugins.
-if ( ! empty( $ignores[ $plugin_file ] ) ) {
-$skipped[] = array(
-'plugin' => $plugin_file,
-'name'   => $name,
-'reason' => __( 'Ignored by user.', 'k-integrity-guard' ),
-);
-continue;
-}
-
-// Skip if no checksum snapshot exists.
-if ( KIG_Utils::checksum_is_stale( $plugin_file ) ) {
-$skipped[] = array(
-'plugin' => $plugin_file,
-'name'   => $name,
-'reason' => __( 'No snapshot available. Generate one in Settings.', 'k-integrity-guard' ),
-);
-continue;
-}
-
-$plugins[ $plugin_file ] = array(
-'plugin_file' => $plugin_file,
-'name'        => $name,
-'version'     => $info['version'] ?? '',
-'status'      => 'pending',
-'modified'    => array(),
-'missing'     => array(),
-'added'       => array(),
-'errors'      => array(),
-);
-
-$order[] = $plugin_file;
-}
-
-$state['plugins']     = $plugins;
-$state['order']       = $order;
-$state['skipped']     = $skipped;
-$state['errors']      = array();
-$state['processed']   = 0;
-$state['total']       = count( $order );
-$state['issue_total'] = 0;
-
-return true;
-}
-
-/**
- * Process the next third-party plugin in the verification queue.
- *
- * @param array<string,mixed> $state Target state (passed by reference).
- * @return array<string,mixed>
- */
-private function process_next_third_party_plugin( array &$state ): array {
-$index = (int) ( $state['processed'] ?? 0 );
-$order = $state['order'] ?? array();
-$total = count( $order );
-
-if ( $index >= $total ) {
-return array(
-'finished' => true,
-'error'    => false,
-'message'  => __( 'Third-party plugin verification completed.', 'k-integrity-guard' ),
-);
-}
-
-$key    = $order[ $index ];
-$plugin = &$state['plugins'][ $key ];
-
-$state['processed']++;
-
-$result = $this->scan_single_third_party_plugin( $plugin );
-
-if ( is_wp_error( $result ) ) {
-$error_message = $result->get_error_message();
-
-$state['errors'][] = array(
-'plugin'  => $key,
-'name'    => $plugin['name'] ?? $key,
-'message' => $error_message,
-);
-
-$message = sprintf(
-/* translators: %s: Plugin name. */
-__( 'Verification failed for plugin %s.', 'k-integrity-guard' ),
-$plugin['name'] ?? $key
-);
-
-unset( $plugin );
-
-return array(
-'finished' => false,
-'error'    => true,
-'message'  => $message,
-);
-}
-
-$plugin['modified'] = $result['modified'];
-$plugin['missing']  = $result['missing'];
-$plugin['added']    = $result['added'];
-$plugin['errors']   = $result['errors'];
-$plugin['status']   = $result['status'];
-$plugin['message']  = $result['message'];
-
-if ( 'issues' === $result['status'] ) {
-$state['issue_total'] = (int) ( $state['issue_total'] ?? 0 ) + 1;
-}
-
-$message = sprintf(
-/* translators: 1: plugin name, 2: current position, 3: total. */
-__( 'Checked plugin %1$s (%2$d of %3$d).', 'k-integrity-guard' ),
-$plugin['name'] ?? $key,
-$index + 1,
-$total
-);
-
-if ( ! empty( $result['message'] ) ) {
-$message = $result['message'];
-}
-
-unset( $plugin );
-
-return array(
-'finished' => false,
-'error'    => false,
-'message'  => $message,
-);
-}
-
-/**
- * Verify a single third-party plugin against its snapshot.
- *
- * @param array<string,mixed> $plugin Plugin payload.
- * @return array<string,mixed>|WP_Error
- */
-private function scan_single_third_party_plugin( array $plugin ) {
-$plugin_file = $plugin['plugin_file'] ?? '';
-$name        = $plugin['name'] ?? $plugin_file;
-
-if ( '' === $plugin_file ) {
-return new WP_Error( 'kig_plugin_data', __( 'Insufficient data to verify plugin.', 'k-integrity-guard' ) );
-}
-
-// Load checksum snapshot.
-$checksums_data = KIG_Utils::read_plugin_checksum_json( $plugin_file );
-if ( ! $checksums_data || empty( $checksums_data['files'] ) ) {
-return new WP_Error( 'kig_no_checksum', __( 'No checksum snapshot available.', 'k-integrity-guard' ) );
-}
-
-// Determine plugin root directory.
-$base = dirname( $plugin_file );
-$root = WP_PLUGIN_DIR;
-
-if ( '.' !== $base && '' !== $base ) {
-$root = trailingslashit( WP_PLUGIN_DIR ) . $base;
-}
-
-if ( ! is_dir( $root ) ) {
-return new WP_Error( 'kig_plugin_path', __( 'Plugin directory could not be located.', 'k-integrity-guard' ) );
-}
-
-// Compare files against snapshot.
-$algorithm  = $checksums_data['algorithm'] ?? 'md5';
-$comparison = $this->compare_extension_files( $root, $checksums_data['files'], $algorithm, true );
-
-$has_issues = ! empty( $comparison['modified'] ) || ! empty( $comparison['missing'] ) || ! empty( $comparison['added'] );
-$status     = $has_issues ? 'issues' : 'ok';
-$message    = $has_issues
-			? sprintf(
-				/* translators: %s: Plugin name. */
-				__( 'Changes detected in plugin %s.', 'k-integrity-guard' ),
-				$name
-			)
-			: sprintf(
-				/* translators: %s: Plugin name. */
-				__( 'Plugin %s matches snapshot.', 'k-integrity-guard' ),
-				$name
-			);
-
-return array(
-'status'   => $status,
-'message'  => $message,
-'modified' => $comparison['modified'],
-'missing'  => $comparison['missing'],
-'added'    => $comparison['added'],
-'errors'   => $comparison['errors'],
-);
-}
-
-/**
- * Finalise third-party plugin verification state.
- *
- * @param array<string,mixed> $state Target state (passed by reference).
- * @return void
- */
-private function finalize_third_party_plugins_target( array &$state ): void {
-$issues = 0;
-foreach ( $state['plugins'] ?? array() as $plugin ) {
-if ( 'issues' === ( $plugin['status'] ?? '' ) ) {
-$issues++;
-}
-}
-
-$state['issue_total'] = $issues;
-$state['processed']   = isset( $state['total'] ) ? (int) $state['total'] : (int) count( $state['plugins'] ?? array() );
-}
-
-/**
- * Summarize third-party plugin verification results.
- *
- * @param array<string,mixed> $state Target state.
- * @return array<string,mixed>
- */
-private function summarize_third_party_plugins_result( array $state ): array {
-$order   = isset( $state['order'] ) && is_array( $state['order'] ) ? $state['order'] : array_keys( $state['plugins'] ?? array() );
-$plugins = $state['plugins'] ?? array();
-$items   = array();
-
-foreach ( $order as $key ) {
-if ( empty( $plugins[ $key ] ) ) {
-continue;
-}
-
-$data     = $plugins[ $key ];
-$items[] = array(
-'key'      => $key,
-'name'     => $data['name'] ?? $key,
-'version'  => $data['version'] ?? '',
-'status'   => $data['status'] ?? 'unknown',
-'message'  => $data['message'] ?? '',
-'modified' => $data['modified'] ?? array(),
-'missing'  => $data['missing'] ?? array(),
-'added'    => $data['added'] ?? array(),
-'errors'   => $data['errors'] ?? array(),
-);
-}
-
-$skipped = array();
-foreach ( $state['skipped'] ?? array() as $entry ) {
-$skipped[] = array(
-'key'    => $entry['plugin'] ?? '',
-'name'   => $entry['name'] ?? '',
-'reason' => $entry['reason'] ?? '',
-);
-}
-
-$errors = array();
-foreach ( $state['errors'] ?? array() as $entry ) {
-$errors[] = array(
-'key'     => $entry['plugin'] ?? '',
-'name'    => $entry['name'] ?? '',
-'message' => $entry['message'] ?? '',
-);
-}
-
-$total         = (int) ( $state['total'] ?? count( $items ) );
-$issues        = (int) ( $state['issue_total'] ?? 0 );
-$skipped_count = count( $skipped );
-$error_count   = count( $errors );
-
-return array(
-'status'  => $state['status'] ?? 'unknown',
-'summary' => $this->build_third_party_plugins_summary_message( $state ),
-'items'   => $items,
-'skipped' => $skipped,
-'errors'  => $errors,
-'totals'  => array(
-'verified' => $total,
-'issues'   => $issues,
-'skipped'  => $skipped_count,
-'errors'   => $error_count,
-),
-);
-}
-
-/**
- * Build summary message for third-party plugin verification results.
- *
- * @param array<string,mixed> $state Target state.
- * @return string
- */
-private function build_third_party_plugins_summary_message( array $state ): string {
-$total       = (int) ( $state['total'] ?? 0 );
-$issues      = (int) ( $state['issue_total'] ?? 0 );
-$skipped     = is_array( $state['skipped'] ?? null ) ? count( $state['skipped'] ) : 0;
-$error_count = is_array( $state['errors'] ?? null ) ? count( $state['errors'] ) : 0;
-
-if ( 0 === $total ) {
-if ( $skipped > 0 ) {
-return __( 'No third-party plugins with snapshots were available for verification.', 'k-integrity-guard' );
-}
-
-return __( 'No third-party plugins required verification.', 'k-integrity-guard' );
-}
-
-if ( 0 === $issues && 0 === $error_count ) {
-if ( $skipped > 0 ) {
-return sprintf(
-/* translators: %d: number of plugins. */
-__( 'All third-party plugins verified successfully. %d plugin(s) were skipped.', 'k-integrity-guard' ),
-$skipped
-);
-}
-
-return __( 'All third-party plugins match their snapshots.', 'k-integrity-guard' );
-}
-
-$message = sprintf(
-/* translators: 1: number of plugins with issues, 2: total verified. */
-__( 'Changes detected in %1$d third-party plugin(s) out of %2$d verified.', 'k-integrity-guard' ),
-$issues,
-$total
-);
-
-if ( $error_count > 0 ) {
-$message .= ' ' . sprintf(
-/* translators: %d: number of plugins. */
-__( '%d plugin(s) could not be verified.', 'k-integrity-guard' ),
-$error_count
-);
-}
-
-if ( $skipped > 0 ) {
-$message .= ' ' . sprintf(
-/* translators: %d: number of plugins. */
-__( '%d plugin(s) were skipped.', 'k-integrity-guard' ),
-$skipped
-);
-}
-
-return $message;
-}
 }

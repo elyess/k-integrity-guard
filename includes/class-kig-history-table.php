@@ -226,10 +226,10 @@ class KIG_History_Table extends WP_List_Table {
 		$context = sanitize_key( $item['context'] );
 
 		if ( 'cron' === $context ) {
-			return '<span class="wpig-context-badge wpig-context-cron">' . esc_html__( 'Scheduled', 'k-integrity-guard' ) . '</span>';
+			return '<span class="kig-context-badge kig-context-cron">' . esc_html__( 'Scheduled', 'k-integrity-guard' ) . '</span>';
 		}
 
-		return '<span class="wpig-context-badge wpig-context-manual">' . esc_html__( 'Manual', 'k-integrity-guard' ) . '</span>';
+		return '<span class="kig-context-badge kig-context-manual">' . esc_html__( 'Manual', 'k-integrity-guard' ) . '</span>';
 	}
 
 	/**
@@ -257,6 +257,12 @@ class KIG_History_Table extends WP_List_Table {
 				case 'themes':
 					$labels[] = esc_html__( 'Themes', 'k-integrity-guard' );
 					break;
+				case 'third_party_plugins':
+					$labels[] = esc_html__( 'Third-party plugins', 'k-integrity-guard' );
+					break;
+				case 'third_party_themes':
+					$labels[] = esc_html__( 'Third-party themes', 'k-integrity-guard' );
+					break;
 			}
 		}
 
@@ -273,10 +279,10 @@ class KIG_History_Table extends WP_List_Table {
 		$total = absint( $item['total_issues'] );
 
 		if ( 0 === $total ) {
-			return '<span class="wpig-issues-badge wpig-issues-none">0</span>';
+			return '<span class="kig-issues-badge kig-issues-none">0</span>';
 		}
 
-		return '<span class="wpig-issues-badge wpig-issues-found">' . esc_html( number_format_i18n( $total ) ) . '</span>';
+		return '<span class="kig-issues-badge kig-issues-found">' . esc_html( number_format_i18n( $total ) ) . '</span>';
 	}
 
 	/**
@@ -290,13 +296,13 @@ class KIG_History_Table extends WP_List_Table {
 
 		switch ( $status ) {
 			case 'success':
-				return '<span class="wpig-status-badge wpig-status-success">' . esc_html__( 'Success', 'k-integrity-guard' ) . '</span>';
+				return '<span class="kig-status-badge kig-status-success">' . esc_html__( 'Success', 'k-integrity-guard' ) . '</span>';
 			case 'warning':
-				return '<span class="wpig-status-badge wpig-status-warning">' . esc_html__( 'Warning', 'k-integrity-guard' ) . '</span>';
+				return '<span class="kig-status-badge kig-status-warning">' . esc_html__( 'Warning', 'k-integrity-guard' ) . '</span>';
 			case 'error':
-				return '<span class="wpig-status-badge wpig-status-error">' . esc_html__( 'Error', 'k-integrity-guard' ) . '</span>';
+				return '<span class="kig-status-badge kig-status-error">' . esc_html__( 'Error', 'k-integrity-guard' ) . '</span>';
 			default:
-				return '<span class="wpig-status-badge wpig-status-unknown">' . esc_html__( 'Unknown', 'k-integrity-guard' ) . '</span>';
+				return '<span class="kig-status-badge kig-status-unknown">' . esc_html__( 'Unknown', 'k-integrity-guard' ) . '</span>';
 		}
 	}
 

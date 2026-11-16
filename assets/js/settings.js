@@ -28,11 +28,11 @@
                 });
         }
 
-        $(document).on('click', '.wpig-generate', function () {
+        $(document).on('click', '.kig-generate', function () {
             var $btn = $(this);
             var file = $btn.data('plugin');
             var $row = $btn.closest('tr');
-            var $status = $row.find('.wpig-status');
+            var $status = $row.find('.kig-status');
             var $spin = $row.find('.spinner');
 
             runChecksumRequest($btn, $status, $spin, {
@@ -42,11 +42,11 @@
             });
         });
 
-        $(document).on('click', '.wpig-theme-generate', function () {
+        $(document).on('click', '.kig-theme-generate', function () {
             var $btn = $(this);
             var theme = $btn.data('theme');
             var $row = $btn.closest('tr');
-            var $status = $row.find('.wpig-theme-status');
+            var $status = $row.find('.kig-theme-status');
             var $spin = $row.find('.spinner');
 
             runChecksumRequest($btn, $status, $spin, {

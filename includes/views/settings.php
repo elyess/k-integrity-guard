@@ -22,33 +22,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 	</form>
 
 	<!-- Third-party Plugins Section -->
-	<div class="wpig-third-party-section">
+	<div class="kig-third-party-section">
 		<h2><?php esc_html_e( 'Third-party Plugins', 'k-integrity-guard' ); ?></h2>
 		<p class="description">
 			<?php esc_html_e( 'Plugins not detected as hosted on WordPress.org. Ignore them or generate checksums for integrity verification.', 'k-integrity-guard' ); ?>
 		</p>
 
-		<form method="post" action="options.php" id="wpig-third-party-plugins-form">
+		<form method="post" action="options.php" id="kig-third-party-plugins-form">
 			<?php
 				settings_fields( KIG_Settings::PAGE );
+				KIG_Settings::section_field( 'third_party' );
 				$settings->field_third_party_list();
-				submit_button( __( 'Save Plugin Settings', 'k-integrity-guard' ), 'primary', 'submit', true, array( 'id' => 'wpig-third-party-plugins-submit' ) );
+				submit_button( __( 'Save Plugin Settings', 'k-integrity-guard' ), 'primary', 'submit', true, array( 'id' => 'kig-third-party-plugins-submit' ) );
 			?>
 		</form>
 	</div>
 
 	<!-- Third-party Themes Section -->
-	<div class="wpig-third-party-section">
-		<h2><?php esc_html_e( 'Third-party Themes', 'k-integrity-guard' ); ?></h2>
+	<div class="kig-third-party-section">
+		<h2><?php esc_html_e( 'Theme Snapshots', 'k-integrity-guard' ); ?></h2>
 		<p class="description">
-			<?php esc_html_e( 'Themes not detected as hosted on WordPress.org. Ignore them or generate checksums for integrity verification.', 'k-integrity-guard' ); ?>
+			<?php esc_html_e( 'WordPress.org does not publish theme checksums, so themes are verified against a snapshot. Generate one for each theme you want checked, or ignore it. Only the default themes that ship with your WordPress version are checked by the core scan; older default themes need a snapshot. If you edited a shipped default theme yourself, generate its snapshot: the core scan then accepts your edits and reports only later changes, until the theme is updated.', 'k-integrity-guard' ); ?>
 		</p>
 
-		<form method="post" action="options.php" id="wpig-third-party-themes-form">
+		<form method="post" action="options.php" id="kig-third-party-themes-form">
 			<?php
 				settings_fields( KIG_Settings::PAGE );
+				KIG_Settings::section_field( 'third_party_themes' );
 				$settings->field_third_party_themes_list();
-				submit_button( __( 'Save Theme Settings', 'k-integrity-guard' ), 'primary', 'submit', true, array( 'id' => 'wpig-third-party-themes-submit' ) );
+				submit_button( __( 'Save Theme Settings', 'k-integrity-guard' ), 'primary', 'submit', true, array( 'id' => 'kig-third-party-themes-submit' ) );
 			?>
 		</form>
 	</div>

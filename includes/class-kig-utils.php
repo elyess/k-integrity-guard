@@ -146,8 +146,18 @@ class KIG_Utils {
 	 */
 	public static function checksums_dir() {
 		$uploads = wp_upload_dir();
-		$dir     = trailingslashit( $uploads['basedir'] ) . 'k-integrity-guard/checksums';
+		$base    = trailingslashit( $uploads['basedir'] ) . 'k-integrity-guard';
+		$dir     = $base . '/checksums';
 		wp_mkdir_p( $dir );
+
+		// The uploads folder is public: block directory listing and direct access to snapshots.
+		if ( ! file_exists( $base . '/index.php' ) ) {
+			file_put_contents( $base . '/index.php', "<?php // Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		}
+		if ( ! file_exists( $base . '/.htaccess' ) ) {
+			file_put_contents( $base . '/.htaccess', "<IfModule mod_authz_core.c>\n\tRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n\tDeny from all\n</IfModule>\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		}
+
 		return $dir;
 	}
 
@@ -227,20 +237,11 @@ class KIG_Utils {
 			return new WP_Error( 'kig_not_found', __( 'Plugin not found.', 'k-integrity-guard' ) );
 		}
 
-		$root = WP_PLUGIN_DIR . '/' . dirname( $plugin_file );
 		$algo = 'sha256';
-		$map  = array();
-
-		$it = new RecursiveIteratorIterator(
-			new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS )
-		);
-		foreach ( $it as $f ) {
-			/** @var SplFileInfo $f */
-			if ( $f->isFile() ) {
-				$rel         = ltrim( str_replace( $root, '', $f->getPathname() ), '/\\' );
-				$map[ $rel ] = hash_file( $algo, $f->getPathname() );
-			}
-		}
+		// A single-file plugin (e.g. hello.php) has no folder of its own: hash only that file.
+		$map  = '.' === dirname( $plugin_file )
+			? array( $plugin_file => hash_file( $algo, WP_PLUGIN_DIR . '/' . $plugin_file ) )
+			: self::hash_directory( WP_PLUGIN_DIR . '/' . dirname( $plugin_file ), $algo );
 
 		$payload = array(
 			'plugin_file'  => $plugin_file,
@@ -258,6 +259,28 @@ class KIG_Utils {
 		}
 
 		return $path;
+	}
+
+	/**
+	 * Hash every file under a directory.
+	 *
+	 * @param string $root Absolute directory path.
+	 * @param string $algo Hash algorithm.
+	 * @return array<string,string> Hashes keyed by path relative to $root.
+	 */
+	private static function hash_directory( $root, $algo ) {
+		$map = array();
+		$it  = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS )
+		);
+		foreach ( $it as $f ) {
+			/** @var SplFileInfo $f */
+			if ( $f->isFile() ) {
+				$rel         = ltrim( str_replace( $root, '', $f->getPathname() ), '/\\' );
+				$map[ $rel ] = hash_file( $algo, $f->getPathname() );
+			}
+		}
+		return $map;
 	}
 
 	/**
@@ -349,6 +372,22 @@ class KIG_Utils {
 	}
 
 	/**
+	 * Read checksum JSON for a theme.
+	 *
+	 * @param string $stylesheet Theme stylesheet.
+	 * @return array|null Decoded JSON array or null if missing/invalid.
+	 */
+	public static function read_theme_checksum_json( $stylesheet ) {
+		$path = self::theme_checksum_path( $stylesheet );
+		if ( ! file_exists( $path ) ) {
+			return null;
+		}
+		$raw = file_get_contents( $path );
+		$dec = json_decode( $raw, true );
+		return is_array( $dec ) ? $dec : null;
+	}
+
+	/**
 	 * Determine if a theme checksum is stale.
 	 *
 	 * @param string $stylesheet Theme stylesheet.
@@ -360,14 +399,8 @@ class KIG_Utils {
 			return false;
 		}
 
-		$path = self::theme_checksum_path( $stylesheet );
-		if ( ! file_exists( $path ) ) {
-			return true;
-		}
-
-		$raw = file_get_contents( $path );
-		$dec = json_decode( $raw, true );
-		if ( ! is_array( $dec ) ) {
+		$dec = self::read_theme_checksum_json( $stylesheet );
+		if ( ! $dec ) {
 			return true;
 		}
 
@@ -386,20 +419,8 @@ class KIG_Utils {
 			return new WP_Error( 'kig_theme_not_found', __( 'Theme not found.', 'k-integrity-guard' ) );
 		}
 
-		$root = $theme->get_stylesheet_directory();
 		$algo = 'sha256';
-		$map  = array();
-
-		$it = new RecursiveIteratorIterator(
-			new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS )
-		);
-		foreach ( $it as $f ) {
-			/** @var SplFileInfo $f */
-			if ( $f->isFile() ) {
-				$rel         = ltrim( str_replace( $root, '', $f->getPathname() ), '/\\' );
-				$map[ $rel ] = hash_file( $algo, $f->getPathname() );
-			}
-		}
+		$map  = self::hash_directory( $theme->get_stylesheet_directory(), $algo );
 
 		$payload = array(
 			'stylesheet'  => $stylesheet,

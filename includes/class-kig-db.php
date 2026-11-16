@@ -22,14 +22,8 @@ class KIG_DB {
 	/**
 	 * Option name for storing database version.
 	 */
-	/**
-	 * Option name for storing database version.
-	 */
 	const DB_VERSION_OPTION = 'kig_db_version';
 
-	/**
-	 * Cache group for scan counts.
-	 */
 	/**
 	 * Cache group for scan counts.
 	 */
@@ -134,6 +128,7 @@ class KIG_DB {
 			'created_by'   => absint( $data['created_by'] ),
 		);
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$result = $wpdb->insert(
 			self::get_table_name(),
 			$insert_data,
@@ -224,6 +219,8 @@ class KIG_DB {
 
 		$where_clause = implode( ' AND ', $where );
 
+		// The WHERE clause only joins fixed "column = %s" strings; every value goes through prepare().
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		// Get total count.
 		if ( ! empty( $query_args ) ) {
 			$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name_esc} WHERE {$where_clause}", $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -237,10 +234,12 @@ class KIG_DB {
 
 		$items = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
+				"SELECT * FROM {$table_name_esc} WHERE {$where_clause} ORDER BY {$orderby_esc} {$order} LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery
+				...$query_args
 			),
 			ARRAY_A
 		);
+		// phpcs:enable
 
 		// Decode JSON fields.
 		if ( ! empty( $items ) ) {
@@ -280,6 +279,7 @@ class KIG_DB {
 		}
 
 		$table_name = self::get_table_name();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$scan       = $wpdb->get_row(
 			$wpdb->prepare( "SELECT * FROM " . esc_sql( $table_name ) . " WHERE id = %d", $scan_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			ARRAY_A
@@ -312,6 +312,7 @@ class KIG_DB {
 			return false;
 		}
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$result = $wpdb->delete(
 			self::get_table_name(),
 			array( 'id' => $scan_id ),
@@ -348,8 +349,9 @@ class KIG_DB {
 			return 0;
 		}
 
-		$ids_string = implode( ',', $scan_ids );
-		$result     = $wpdb->query( "DELETE FROM {$table_name} WHERE id IN ({$ids_string})" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$placeholders = implode( ',', array_fill( 0, count( $scan_ids ), '%d' ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One %d placeholder per ID.
+		$result       = $wpdb->query( $wpdb->prepare( "DELETE FROM " . esc_sql( self::get_table_name() ) . " WHERE id IN ({$placeholders})", ...$scan_ids ) );
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
@@ -370,15 +372,17 @@ class KIG_DB {
 	public static function delete_all_scans() {
 		global $wpdb;
 
-		$table_name = self::get_table_name();
-		$result     = $wpdb->query( "TRUNCATE TABLE " . esc_sql( $table_name ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$table_name = esc_sql( self::get_table_name() );
+		// TRUNCATE returns true, not a row count, so count first for the "N scans deleted" message.
+		$count  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->query( "TRUNCATE TABLE {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 		if ( false !== $result ) {
 			wp_cache_delete( 'scan_counts', self::CACHE_GROUP );
 			self::increment_last_changed();
 		}
 
-		return false !== $result ? (int) $result : 0;
+		return false !== $result ? $count : 0;
 	}
 
 	/**
@@ -392,8 +396,10 @@ class KIG_DB {
 
 		$days       = absint( $days );
 		$table_name = self::get_table_name();
-		$date       = gmdate( 'Y-m-d H:i:s', strtotime( "-{$days} days" ) );
+		// scan_date is stored in site-local time (current_time( 'mysql' )), so compare in site time.
+		$date       = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - $days * DAY_IN_SECONDS ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM " . esc_sql( $table_name ) . " WHERE scan_date < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -424,6 +430,7 @@ class KIG_DB {
 		global $wpdb;
 		$table_name = self::get_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; results are cached in the kig_scans cache group where it matters.
 		$results = $wpdb->get_results(
 			"SELECT status, COUNT(*) as count FROM " . esc_sql( $table_name ) . " GROUP BY status", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 			ARRAY_A

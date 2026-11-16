@@ -9,47 +9,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Handle bulk and single actions.
-if ( isset( $_GET['action'] ) ) {
-	$action = sanitize_key( $_GET['action'] );
+// Delete, bulk delete and empty-history are handled in K_Integrity_Guard::handle_history_actions() before output.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Read-only display parameters (view ID and result counts); every deletion is nonce-checked there.
+// Handle view details.
+if ( isset( $_GET['action'], $_GET['scan_id'] ) && 'view' === sanitize_key( $_GET['action'] ) ) {
+	$scan_id = absint( $_GET['scan_id'] );
+	$scan    = KIG_DB::get_scan( $scan_id );
 
-	// Handle single delete.
-	if ( 'delete' === $action && isset( $_GET['scan_id'] ) ) {
-		$scan_id = absint( $_GET['scan_id'] );
-		if ( check_admin_referer( 'delete_scan_' . $scan_id ) ) {
-			KIG_DB::delete_scan( $scan_id );
-			wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&deleted=1' ) );
-			exit;
-		}
+	if ( $scan ) {
+		include __DIR__ . '/history-detail.php';
+		return;
 	}
-
-	// Handle view details.
-	if ( 'view' === $action && isset( $_GET['scan_id'] ) ) {
-		$scan_id = absint( $_GET['scan_id'] );
-		$scan    = KIG_DB::get_scan( $scan_id );
-
-		if ( $scan ) {
-			include __DIR__ . '/history-detail.php';
-			return;
-		}
-	}
-}
-
-// Handle bulk actions.
-if ( isset( $_POST['action'] ) && 'delete' === $_POST['action'] && ! empty( $_POST['scan_ids'] ) ) {
-	check_admin_referer( 'bulk-scans' );
-	$scan_ids = array_map( 'absint', $_POST['scan_ids'] );
-	KIG_DB::delete_scans( $scan_ids );
-	wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&deleted=' . count( $scan_ids ) ) );
-	exit;
-}
-
-// Handle empty history action.
-if ( isset( $_POST['kig_empty_history'] ) ) {
-	check_admin_referer( 'kig_empty_history' );
-	$deleted_count = KIG_DB::delete_all_scans();
-	wp_safe_redirect( admin_url( 'admin.php?page=' . K_Integrity_Guard::SLUG_HISTORY . '&emptied=' . $deleted_count ) );
-	exit;
 }
 
 $table = new KIG_History_Table();
@@ -97,12 +67,12 @@ $table->prepare_items();
 		<?php esc_html_e( 'View the complete history of all integrity scans. Click on a scan to see detailed results.', 'k-integrity-guard' ); ?>
 	</p>
 
-	<form method="post" id="wpig-history-form">
+	<form method="post" id="kig-history-form">
 		<?php $table->views(); ?>
 		<?php $table->display(); ?>
 	</form>
 
-	<div class="wpig-history-actions" style="margin-top: 20px;">
+	<div class="kig-history-actions" style="margin-top: 20px;">
 		<form method="post" style="display:inline;">
 			<?php wp_nonce_field( 'kig_empty_history' ); ?>
 			<input type="hidden" name="kig_empty_history" value="1" />
@@ -114,57 +84,57 @@ $table->prepare_items();
 </div>
 
 <style>
-.wpig-status-badge {
+.kig-status-badge {
 	display: inline-block;
 	padding: 3px 8px;
 	border-radius: 3px;
 	font-size: 12px;
 	font-weight: 600;
 }
-.wpig-status-success {
+.kig-status-success {
 	background-color: #d4edda;
 	color: #155724;
 }
-.wpig-status-warning {
+.kig-status-warning {
 	background-color: #fff3cd;
 	color: #856404;
 }
-.wpig-status-error {
+.kig-status-error {
 	background-color: #f8d7da;
 	color: #721c24;
 }
-.wpig-status-unknown {
+.kig-status-unknown {
 	background-color: #e2e3e5;
 	color: #383d41;
 }
 
-.wpig-context-badge {
+.kig-context-badge {
 	display: inline-block;
 	padding: 3px 8px;
 	border-radius: 3px;
 	font-size: 12px;
 }
-.wpig-context-manual {
+.kig-context-manual {
 	background-color: #cfe2ff;
 	color: #084298;
 }
-.wpig-context-cron {
+.kig-context-cron {
 	background-color: #e7e9ee;
 	color: #41464b;
 }
 
-.wpig-issues-badge {
+.kig-issues-badge {
 	display: inline-block;
 	padding: 3px 8px;
 	border-radius: 3px;
 	font-size: 12px;
 	font-weight: 600;
 }
-.wpig-issues-none {
+.kig-issues-none {
 	background-color: #d4edda;
 	color: #155724;
 }
-.wpig-issues-found {
+.kig-issues-found {
 	background-color: #fff3cd;
 	color: #856404;
 }

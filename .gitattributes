@@ -1,0 +1,10 @@
+# Files kept out of the release zip (git archive) and the WordPress.org SVN trunk.
+/.wordpress-org   export-ignore
+/tests            export-ignore
+/bin              export-ignore
+/phpunit.xml.dist export-ignore
+/README.md        export-ignore
+/CLAUDE.md        export-ignore
+/.gitignore       export-ignore
+/.gitattributes   export-ignore
+/.distignore      export-ignore

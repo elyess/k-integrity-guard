@@ -15,18 +15,18 @@
 		}
 
 		var settings = window.kigScan;
-		var form = $( '#wpig-scan-form' );
+		var form = $( '#kig-scan-form' );
 
 		if ( ! form.length ) {
 			return;
 		}
 
-		var startButton = $( '#wpig-start-scan' );
-		var progressBar = $( '#wpig-scan-progress' );
-		var statusText = $( '#wpig-scan-status-text' );
-		var messageArea = $( '#wpig-scan-message' );
-		var summaryArea = $( '#wpig-scan-summary' );
-		var lastSummaryArea = $( '#wpig-last-scan' );
+		var startButton = $( '#kig-start-scan' );
+		var progressBar = $( '#kig-scan-progress' );
+		var statusText = $( '#kig-scan-status-text' );
+		var messageArea = $( '#kig-scan-message' );
+		var summaryArea = $( '#kig-scan-summary' );
+		var lastSummaryArea = $( '#kig-last-scan' );
 
 		resetProgress();
 		renderPreviousSummary( settings.lastScan );
@@ -157,9 +157,16 @@
 
 		summaryArea.show();
 
-		var core = results && results.core ? results.core : null;
-		var plugins = results && results.plugins ? results.plugins : null;
-		var themes = results && results.themes ? results.themes : null;
+		// Core file lists live in core.items[0], like the other targets.
+		var core = results && results.core && isArray( results.core.items ) ? results.core.items[0] : null;
+		var extensionTargets = [
+			{ key: 'plugins', heading: settings.text.pluginsHeading || 'Plugins' },
+			{ key: 'themes', heading: settings.text.themesHeading || 'Themes' },
+			{ key: 'third_party_plugins', heading: settings.text.thirdPartyPluginsHeading || 'Third-Party Plugins' },
+			{ key: 'third_party_themes', heading: settings.text.thirdPartyThemesHeading || 'Third-Party Themes' }
+		].filter( function ( target ) {
+			return results && results[ target.key ];
+		} );
 		var hasIssues = false;
 		var hasErrors = false;
 
@@ -178,9 +185,10 @@
 			}
 		}
 
-		if ( plugins ) {
-			if ( isArray( plugins.items ) ) {
-				plugins.items.forEach( function ( item ) {
+		extensionTargets.forEach( function ( target ) {
+			var data = results[ target.key ];
+			if ( isArray( data.items ) ) {
+				data.items.forEach( function ( item ) {
 					if ( item && item.status === 'issues' ) {
 						hasIssues = true;
 					}
@@ -189,26 +197,10 @@
 					}
 				} );
 			}
-			if ( isArray( plugins.errors ) && plugins.errors.length ) {
+			if ( isArray( data.errors ) && data.errors.length ) {
 				hasErrors = true;
 			}
-		}
-
-		if ( themes ) {
-			if ( isArray( themes.items ) ) {
-				themes.items.forEach( function ( item ) {
-					if ( item && item.status === 'issues' ) {
-						hasIssues = true;
-					}
-					if ( item && ( item.status === 'error' || ( isArray( item.errors ) && item.errors.length ) ) ) {
-						hasErrors = true;
-					}
-				} );
-			}
-			if ( isArray( themes.errors ) && themes.errors.length ) {
-				hasErrors = true;
-			}
-		}
+		} );
 
 		var noticeClass = 'notice notice-success';
 		if ( hasErrors ) {
@@ -225,13 +217,9 @@
 			renderCoreSection( core );
 		}
 
-		if ( plugins ) {
-			renderTargetSection( settings.text.pluginsHeading || 'Plugins', plugins );
-		}
-
-		if ( themes ) {
-			renderTargetSection( settings.text.themesHeading || 'Themes', themes );
-		}
+		extensionTargets.forEach( function ( target ) {
+			renderTargetSection( target.heading, results[ target.key ] );
+		} );
 
 		if ( ! hasIssues && ! hasErrors ) {
 			summaryArea.append( $( '<p />' ).text( settings.text.noIssues ) );
@@ -245,13 +233,13 @@
 
 		var target = container || summaryArea;
 		var label = settings.text[ labelKey ] ? settings.text[ labelKey ].replace( '%d', items.length ) : '';
-		var wrapper = $( '<div class="wpig-summary-group" />' );
+		var wrapper = $( '<div class="kig-summary-group" />' );
 
 		if ( label ) {
 			wrapper.append( $( '<p />' ).append( $( '<strong />' ).text( label ) ) );
 		}
 
-		var list = $( '<ul class="wpig-summary-list" />' );
+		var list = $( '<ul class="kig-summary-list" />' );
 
 		items.slice( 0, MAX_LIST_ITEMS ).forEach( function ( item ) {
 			var file = extractFile( item );
@@ -262,7 +250,7 @@
 			var entry = $( '<li />' ).text( file );
 
 			if ( $.isPlainObject( item ) && item.actual && item.expected && item.actual !== item.expected ) {
-				entry.append( $( '<span class="wpig-summary-hash" />' ).text( ' (' + item.actual + ')' ) );
+				entry.append( $( '<span class="kig-summary-hash" />' ).text( ' (' + item.actual + ')' ) );
 			}
 
 			list.append( entry );
@@ -283,9 +271,9 @@
 	}
 
 	function renderCoreSection( core ) {
-		var container = $( '<div class="wpig-summary-section" />' );
+		var container = $( '<div class="kig-summary-section" />' );
 		var heading = settings.text.coreHeading || 'WordPress Core';
-		container.append( $( '<h3 class="wpig-summary-heading" />' ).text( heading ) );
+		container.append( $( '<h3 class="kig-summary-heading" />' ).text( heading ) );
 
 		var modified = isArray( core.modified ) ? core.modified : [];
 		var missing = isArray( core.missing ) ? core.missing : [];
@@ -310,14 +298,14 @@
 	}
 
 	function renderTargetSection( heading, data ) {
-		var container = $( '<div class="wpig-summary-section" />' );
-		container.append( $( '<h3 class="wpig-summary-heading" />' ).text( heading || '' ) );
+		var container = $( '<div class="kig-summary-section" />' );
+		container.append( $( '<h3 class="kig-summary-heading" />' ).text( heading || '' ) );
 
 		var items = isArray( data.items ) ? data.items : [];
 		var hasContent = false;
 
 		items.forEach( function ( item ) {
-			var block = $( '<div class="wpig-summary-extension-item" />' );
+			var block = $( '<div class="kig-summary-extension-item" />' );
 			var titleParts = [];
 
 			if ( item && item.name ) {
@@ -367,13 +355,13 @@
 
 		if ( isArray( data.skipped ) && data.skipped.length ) {
 			var skippedLabel = settings.text.skippedLabel ? settings.text.skippedLabel.replace( '%d', data.skipped.length ) : '';
-			var skippedWrapper = $( '<div class="wpig-summary-group" />' );
+			var skippedWrapper = $( '<div class="kig-summary-group" />' );
 
 			if ( skippedLabel ) {
 				skippedWrapper.append( $( '<p />' ).append( $( '<strong />' ).text( skippedLabel ) ) );
 			}
 
-			var skippedList = $( '<ul class="wpig-summary-list" />' );
+			var skippedList = $( '<ul class="kig-summary-list" />' );
 
 			data.skipped.slice( 0, MAX_LIST_ITEMS ).forEach( function ( entry ) {
 				if ( ! entry ) {
@@ -418,12 +406,12 @@
 			return false;
 		}
 
-		var wrapper = $( '<div class="wpig-summary-group" />' );
+		var wrapper = $( '<div class="kig-summary-group" />' );
 		if ( label ) {
 			wrapper.append( $( '<p />' ).append( $( '<strong />' ).text( label ) ) );
 		}
 
-		var list = $( '<ul class="wpig-summary-list" />' );
+		var list = $( '<ul class="kig-summary-list" />' );
 
 		entries.slice( 0, MAX_LIST_ITEMS ).forEach( function ( entry ) {
 			if ( ! entry ) {
